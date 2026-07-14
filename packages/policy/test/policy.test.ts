@@ -75,4 +75,18 @@ describe("preference policy compiler", () => {
     expect(result.normalized.preferredFundingAsset).toBe("WMON");
     expect(result.warning).toContain("provider offline");
   });
+
+  it("rejects schema-valid model output that changes recognized preference semantics", async () => {
+    const result = await compilePreferenceWithModel("Preserve USDC", async () => ({
+      ...DEFAULT_PAYMENT_POLICY_V1,
+      preserveAssets: ["USDC"],
+      preferredFundingAsset: "AUTO",
+    }));
+    expect(result.status).toBe("compiled");
+    if (result.status !== "compiled") return;
+    expect(result.source).toBe("deterministic-fallback");
+    expect(result.policy.preserveAssets).toEqual(["USDC"]);
+    expect(result.policy.preferredFundingAsset).toBe("WMON");
+    expect(result.warning).toContain("conflicts with deterministic input checks");
+  });
 });

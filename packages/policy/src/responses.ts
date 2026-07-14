@@ -4,7 +4,15 @@ export const POLICY_INSTRUCTIONS = `You compile a payer's natural-language prefe
 Only interpret preferences about preserving MON, WMON, or USDC; preferred funding; a minimum USDC reserve; a maximum WMON spend; a maximum swap cost in basis points; and whether borrowing is allowed.
 Never produce addresses, chain configuration, calldata, contract targets, transaction instructions, prose, or fields outside the schema.
 Use base units for minimumUsdcReserveUnits (6 decimals) and wei for maxWmonSpendWei (18 decimals).
-Use null for limits the payer did not request. Use AUTO when no funding asset is preferred. Default borrowingAllowed to false unless the payer explicitly allows borrowing.`;
+Use null for limits the payer did not request. Use AUTO only when no funding asset is preferred. Default borrowingAllowed to false unless the payer explicitly allows borrowing.
+Semantic rules:
+- "Preserve USDC" means preserveAssets ["USDC"] and preferredFundingAsset "WMON".
+- "Preserve MON" means preserveAssets ["MON"] and preferredFundingAsset "USDC".
+- "Preserve WMON" means preserveAssets ["WMON"] and preferredFundingAsset "USDC".
+- A minimum USDC reserve does not by itself add USDC to preserveAssets.
+- A maximum WMON spend does not by itself add WMON to preserveAssets.
+- A swap-cost cap does not add any preserveAssets.
+- "Never borrow" means borrowingAllowed false.`;
 
 export type ResponsesPreferenceProviderOptions = {
   apiKey: string;

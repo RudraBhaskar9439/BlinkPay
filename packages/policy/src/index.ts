@@ -212,7 +212,12 @@ export async function compilePreferenceWithModel(
 
   try {
     const output = await provider({ preferenceText, schema: paymentPolicyV1JsonSchema });
-    return compiled(parsePaymentPolicyV1(output), "model");
+    const modelPolicy = parsePaymentPolicyV1(output);
+    if (inputCheck.status === "compiled"
+      && !paymentPoliciesEqual(modelPolicy, inputCheck.policy)) {
+      throw new Error("AI policy conflicts with deterministic input checks");
+    }
+    return compiled(modelPolicy, "model");
   } catch (error) {
     const deterministic = compilePreferenceText(preferenceText);
     if (deterministic.status === "compiled") {
@@ -227,6 +232,16 @@ export async function compilePreferenceWithModel(
       warning: `AI provider unavailable or invalid: ${getErrorMessage(error)}`,
     };
   }
+}
+
+function paymentPoliciesEqual(left: PaymentPolicyV1, right: PaymentPolicyV1): boolean {
+  return left.version === right.version
+    && [...left.preserveAssets].sort().join("|") === [...right.preserveAssets].sort().join("|")
+    && left.preferredFundingAsset === right.preferredFundingAsset
+    && left.minimumUsdcReserveUnits === right.minimumUsdcReserveUnits
+    && left.maxWmonSpendWei === right.maxWmonSpendWei
+    && left.maxSwapCostBps === right.maxSwapCostBps
+    && left.borrowingAllowed === right.borrowingAllowed;
 }
 
 export function parsePaymentPolicyV1(value: unknown): PaymentPolicyV1 {

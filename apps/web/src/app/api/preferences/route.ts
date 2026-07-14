@@ -35,7 +35,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "preferenceText must be a string" }, { status: 400 });
   }
 
-  const groqApiKey = process.env.LLM_API_KEY?.trim() || process.env.GROQ_API_KEY?.trim();
+  const groqApiKey = process.env.LLM_API_KEY?.trim()
+    || process.env.GROQ_API_KEY?.trim()
+    || process.env.AI_API_KEY?.trim();
   const xaiApiKey = process.env.XAI_API_KEY?.trim();
   const openAiApiKey = process.env.OPENAI_API_KEY?.trim();
   const provider = groqApiKey

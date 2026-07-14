@@ -105,6 +105,21 @@ The live API smoke gate passed for:
 - contradictory preservation/funding rules → HTTP 422 clarification; and
 - executable configuration/prompt injection text → HTTP 422 rejection.
 
+The authenticated Groq gate passed on July 15, 2026 using the configured
+`llama-3.3-70b-versatile` model. `Preserve USDC and never borrow` returned a
+model-sourced policy that preserves USDC, prefers WMON, and forbids borrowing.
+A combined `0.25 USDC` reserve, `0.01 WMON` maximum, and `200 bps` cost cap
+returned the exact normalized base-unit values without inventing preservation
+rules.
+
+The first authenticated run exposed a semantic defect despite valid JSON: the
+model initially returned `AUTO` for **Preserve USDC** and treated numeric caps as
+preservation requests. Static compiler rules were clarified, and BlinkPay now
+cross-checks model output against deterministic semantics whenever the local
+parser recognizes the phrase. A schema-valid disagreement is rejected and
+falls back to the deterministic policy. The corrected authenticated runs passed
+with `source: model` and no fallback warning.
+
 The repository quality gate is `pnpm check`. The production build includes the
 server-only `/api/preferences` endpoint.
 
