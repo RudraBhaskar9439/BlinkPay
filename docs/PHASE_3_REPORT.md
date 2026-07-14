@@ -7,9 +7,9 @@ funding routes, evaluates hard constraints, estimates route costs, and exposes
 the raw evidence used to rank the eligible plans. The planner never accepts
 addresses or calldata from an AI model.
 
-The implementation is complete. Phase 3B remains the manual wallet acceptance
-gate: analyze fresh invoices with different live balances and confirm that the
-displayed eligibility, rejection reasons, and ranking change reproducibly.
+Phase 3A implementation and the Phase 3B live wallet acceptance matrix are
+complete. Fresh invoices with different amounts changed eligibility, rejection
+reasons, and ranking reproducibly from the displayed balances and quote data.
 
 ## Supported candidates
 
@@ -98,22 +98,35 @@ build are run through `pnpm check`.
 The payment page was inspected with a fresh signed test invoice at desktop and
 mobile widths. The deterministic planner and both payment routes render in the
 accessibility tree, the mobile page scrolls through the complete route list,
-and the browser console reports no errors. A wallet-enabled manual run is still
-required because the isolated test browser has no injected EVM wallet.
+and the browser console reports no errors. The separate MetaMask acceptance
+matrix below supplied the wallet-enabled evidence unavailable in the isolated
+test browser.
 
 ## Phase 3B manual acceptance
 
-For each case, create a fresh invoice and click **Analyze wallet routes** with
-the payer wallet connected:
+The matrix passed on Monad testnet on July 15, 2026 with payer
+`0x76D7D56fb21A6969E1F07B722e3c63E2c80a7cB1`:
 
-1. Payer has enough USDC and WMON: both routes are eligible and the displayed
-   score selects the recommendation.
-2. Payer has less USDC than the invoice: direct is unavailable and its balance
-   evidence explains why.
-3. Payer has less WMON than the quote maximum: WMON is unavailable and its
-   balance evidence explains why.
-4. Pay one invoice, then analyze its original link again: both routes are
-   unavailable because the router reports it paid.
+1. **0.1 USDC invoice, both assets sufficient.** Direct USDC ranked first with
+   score `28`. WMON exact output ranked second with a `0.001039017113929055`
+   WMON maximum, `132` bps swap cost, and score `1188`.
+2. **1 USDC invoice, USDC insufficient.** The `0.9` USDC balance rejected the
+   direct route. WMON remained eligible with a `0.011440862602814306` maximum
+   and became the only recommendation.
+3. **4 USDC invoice, both assets insufficient.** Direct rejected `0.9 < 4`
+   USDC. WMON rejected balance `0.048986859568604804` below maximum
+   `0.069033001467828689`. Neither route was recommended, and both payment
+   actions were disabled.
+4. **Paid-invoice replay.** A fresh `0.1` USDC direct payment reduced the live
+   payer balance from `0.9` to `0.8` USDC. Re-analysis of the same signed link
+   read the router's paid flag, rejected both routes, and disabled both payment
+   actions.
 
-The exit gate passes when the same displayed inputs reproduce the same costs,
-eligibility, and route order, with no unexplained score.
+Testing also exposed and fixed two presentation defects before the gate closed:
+unavailable routes no longer leave payment buttons enabled, and terminal
+invoice states no longer report unevaluated quote dependencies as secondary
+failures. Dependent checks are marked pending/not applicable, and unavailable
+plans are not ranked.
+
+The same displayed inputs now reproduce the same eligibility, costs, and route
+order with no unexplained model score. Phase 3 passes its exit gate.

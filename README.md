@@ -45,7 +45,7 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 2C: deploy and fund verified testnet liquidity
 - [x] Phase 2D: complete direct and WMON wallet-to-wallet payments
 - [x] Phase 3A: deterministic portfolio discovery and route engine
-- [ ] Phase 3B: live wallet planner acceptance matrix
+- [x] Phase 3B: live wallet planner acceptance matrix
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
@@ -59,7 +59,7 @@ The Phase 3 implementation now reads live balances, allowances, quote state,
 and replay state; simulates executable routes; and displays deterministic costs,
 constraints, rejection evidence, and ranking. See
 [docs/PHASE_3_REPORT.md](docs/PHASE_3_REPORT.md) for the scoring model and the
-remaining manual wallet matrix.
+completed manual wallet matrix.
 
 ## Local development
 
