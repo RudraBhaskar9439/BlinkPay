@@ -12,6 +12,7 @@
   "dependencies": {
     "@blinkpay/chain": "workspace:*",
     "@blinkpay/core": "workspace:*",
+    "@blinkpay/zerox": "workspace:*",
     "next": "16.2.10",
     "qrcode": "1.5.4",
     "react": "19.2.7",

@@ -40,6 +40,8 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 0B: application and contract toolchains
 - [x] Phase 1A: signed invoice and direct USDC implementation
 - [ ] Phase 1B: live Monad deployment and two-wallet smoke test
+- [x] Phase 2A: exact-output WMON-to-USDC implementation
+- [ ] Phase 2B: current 0x allowlist, fork test, and live WMON payment
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
@@ -79,6 +81,9 @@ docs/                      Architecture and phase evidence
 Phase 1 implementation evidence is recorded in
 [docs/PHASE_1_REPORT.md](docs/PHASE_1_REPORT.md). The remaining deployment gate
 is described in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+Phase 2 implementation evidence and its still-open live gate are recorded in
+[docs/PHASE_2_REPORT.md](docs/PHASE_2_REPORT.md).
 
 ## Network
 

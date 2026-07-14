@@ -567,6 +567,77 @@ code {
   padding-top: 6px;
 }
 
+.walletRow {
+  padding: 4px 0 20px;
+}
+
+.routeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 4px 0 20px;
+}
+
+.routeCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 3px 16px 16px 16px;
+  background: var(--paper);
+}
+
+.routeCard h2,
+.routeCard p {
+  margin: 0;
+}
+
+.routeCard h2 {
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.routeCard > p:not(.cardLabel) {
+  flex: 1;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.featuredRoute {
+  border-color: var(--violet);
+  background: rgba(117, 103, 255, 0.06);
+}
+
+.quoteFacts {
+  display: grid;
+  width: 100%;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 9px;
+  background: rgba(200, 255, 83, 0.42);
+}
+
+.quoteFacts span,
+.quoteFacts small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.quoteFacts strong {
+  overflow-wrap: anywhere;
+}
+
+.routeActions {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .receiptLink {
   display: inline-flex;
   margin-top: 18px;
@@ -658,6 +729,20 @@ code {
   .invoiceFacts > div {
     grid-template-columns: 1fr;
     gap: 5px;
+  }
+
+  .routeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .routeActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .routeActions button {
+    justify-content: center;
+    width: 100%;
   }
 
   .amountPanel strong {

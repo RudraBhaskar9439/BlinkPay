@@ -6,6 +6,8 @@ import {
   monadMainnet,
   monadTestnet,
   usdcAddresses,
+  wmonAddresses,
+  zeroExAllowanceHolderAddresses,
 } from "../src";
 
 describe("Monad configuration", () => {
@@ -17,6 +19,13 @@ describe("Monad configuration", () => {
   it("uses checksummed Circle USDC addresses", () => {
     expect(getAddress(usdcAddresses.mainnet)).toBe(usdcAddresses.mainnet);
     expect(getAddress(usdcAddresses.testnet)).toBe(usdcAddresses.testnet);
+  });
+
+  it("uses checksummed WMON and 0x integration addresses", () => {
+    expect(getAddress(wmonAddresses.mainnet)).toBe(wmonAddresses.mainnet);
+    expect(getAddress(wmonAddresses.testnet)).toBe(wmonAddresses.testnet);
+    expect(getAddress(zeroExAllowanceHolderAddresses.mainnet))
+      .toBe(zeroExAllowanceHolderAddresses.mainnet);
   });
 
   it("uses HTTPS public RPC defaults", () => {

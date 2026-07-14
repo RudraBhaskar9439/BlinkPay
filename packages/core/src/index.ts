@@ -12,8 +12,12 @@ import {
 export const blinkPayRouterAbi = parseAbi([
   "struct Invoice { bytes32 invoiceId; address merchant; address settlementToken; uint256 amount; uint256 expiry; uint256 nonce; uint256 chainId; bytes32 metadataHash; }",
   "function payDirect(Invoice invoice, bytes merchantSignature)",
+  "function payWithSwap(Invoice invoice, bytes merchantSignature, uint256 maxSellAmount, uint256 quoteDeadline, bytes swapCallData)",
   "function paidInvoices(bytes32 invoiceId) view returns (bool)",
   "function settlementAsset() view returns (address)",
+  "function sellAsset() view returns (address)",
+  "function swapTarget() view returns (address)",
+  "function allowanceTarget() view returns (address)",
   "event PaymentSettled(bytes32 indexed invoiceId, address indexed payer, address indexed merchant, address settlementToken, uint256 settlementAmount, uint256 merchantNonce)",
 ]);
 

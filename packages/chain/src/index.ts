@@ -33,6 +33,15 @@ export const usdcAddresses = {
   testnet: "0x534b2f3A21130d7a60830c2Df862319e593943A3",
 } as const satisfies Record<MonadNetwork, Address>;
 
+export const wmonAddresses = {
+  mainnet: "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+  testnet: "0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701",
+} as const satisfies Record<MonadNetwork, Address>;
+
+export const zeroExAllowanceHolderAddresses = {
+  mainnet: "0x0000000000001fF3684f28c67538d4D072C22734",
+} as const;
+
 export type MonadNetwork = "mainnet" | "testnet";
 
 export function getMonadRpcUrl(network: MonadNetwork): string {
