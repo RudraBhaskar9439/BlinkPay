@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./openai": "./src/openai.ts"
+    "./openai": "./src/openai.ts",
+    "./xai": "./src/xai.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

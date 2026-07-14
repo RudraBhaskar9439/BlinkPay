@@ -47,7 +47,7 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 3A: deterministic portfolio discovery and route engine
 - [x] Phase 3B: live wallet planner acceptance matrix
 - [x] Phase 4A: strict natural-language policy compiler and planner constraints
-- [x] Phase 4B: isolated OpenAI Structured Outputs adapter with safe fallback
+- [x] Phase 4B: isolated xAI/OpenAI Structured Outputs adapters with safe fallback
 - [ ] Phase 4C: live wallet preference-switch acceptance matrix
 
 The foundation gate passed on July 14, 2026. See

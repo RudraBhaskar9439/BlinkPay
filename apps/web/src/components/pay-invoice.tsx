@@ -67,6 +67,7 @@ type RouteAnalysis = PlannerResult & { portfolio: PortfolioSnapshot };
 
 type ActivePolicy = {
   source: Extract<PreferenceCompilation, { status: "compiled" }>["source"];
+  provider?: "xai" | "openai";
   policy: PaymentPolicyV1;
   normalized: NormalizedPaymentPolicy;
   explanations: PolicyExplanation[];
@@ -590,7 +591,9 @@ export function PayInvoice({ payload }: { payload?: string }) {
               <p className="cardLabel">Phase 4 · AI preference compiler</p>
               <h2 id="policy-compiler-title">Describe how your money should move.</h2>
             </div>
-            <span className="policySource">{formatPolicySource(activePolicy.source)}</span>
+            <span className="policySource">
+              {formatPolicySource(activePolicy.source, activePolicy.provider)}
+            </span>
           </div>
 
           <label className="policyInput">
@@ -905,6 +908,7 @@ function parsePreferenceResponse(value: unknown): ActivePolicy {
   const policy = parsePaymentPolicyV1(value.policy);
   return {
     source,
+    ...(value.provider === undefined ? {} : { provider: requirePolicyProvider(value.provider) }),
     policy,
     normalized: normalizePaymentPolicy(policy),
     explanations: explainPaymentPolicy(policy),
@@ -922,9 +926,22 @@ function requirePolicySource(
   return value;
 }
 
-function formatPolicySource(source: ActivePolicy["source"]): string {
-  if (source === "model") return "AI compiled · schema verified";
-  if (source === "deterministic-fallback") return "AI offline · deterministic fallback";
+function requirePolicyProvider(value: unknown): NonNullable<ActivePolicy["provider"]> {
+  if (value !== "xai" && value !== "openai") {
+    throw new Error("Preference service returned an invalid provider");
+  }
+  return value;
+}
+
+function formatPolicySource(
+  source: ActivePolicy["source"],
+  provider: ActivePolicy["provider"],
+): string {
+  const providerLabel = provider === "xai" ? "Grok (xAI)" : provider === "openai" ? "OpenAI" : "AI";
+  if (source === "model") return `${providerLabel} compiled · schema verified`;
+  if (source === "deterministic-fallback") {
+    return `${providerLabel} offline · deterministic fallback`;
+  }
   if (source === "safe-default") return "Safe default policy";
   return "Deterministic compiler";
 }

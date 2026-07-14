@@ -4,11 +4,11 @@
 
 Phase 4A and Phase 4B are implemented. Payer language is compiled into a
 versioned payment policy, strictly validated, normalized into planner inputs,
-and displayed as deterministic rules. A server-only OpenAI adapter can compile
-phrases that are outside the local parser while preserving the same validation
-boundary. If the provider is missing, unavailable, refuses, returns incomplete
-output, or returns malformed output, BlinkPay remains usable through a
-deterministic fallback or the safe default policy.
+and displayed as deterministic rules. Server-only xAI and OpenAI adapters can
+compile phrases that are outside the local parser while preserving the same
+validation boundary. If the provider is missing, unavailable, refuses, returns
+incomplete output, or returns malformed output, BlinkPay remains usable through
+a deterministic fallback or the safe default policy.
 
 The final Phase 4C wallet acceptance matrix remains open. It requires the payer
 to analyze the same fresh invoice once with **Preserve MON** and once with
@@ -48,12 +48,15 @@ object is parsed again by BlinkPay's strict validator. Explanations are produced
 from the validated policy by deterministic code; model prose is never rendered
 or used as a score.
 
-The adapter uses the OpenAI Responses API with strict JSON Schema Structured
-Outputs. Its model is configurable through `OPENAI_POLICY_MODEL` and defaults
-to `gpt-5.6-luna`. `OPENAI_API_KEY` is server-only. Without it, the API uses the
-deterministic compiler. The implementation follows the official
-[Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs)
-and [model documentation](https://developers.openai.com/api/docs/models/gpt-5.6-luna).
+The adapters use the Responses API with strict JSON Schema Structured Outputs.
+When `XAI_API_KEY` is present, BlinkPay uses xAI and defaults to `grok-4.3`;
+`XAI_POLICY_MODEL` can override it. xAI takes priority if both provider keys are
+configured. `OPENAI_API_KEY` and `OPENAI_POLICY_MODEL` remain supported as an
+alternative. All keys are server-only. Without a provider key, the API uses the
+deterministic compiler. The implementation follows xAI's official
+[Structured Outputs guide](https://docs.x.ai/developers/model-capabilities/text/structured-outputs),
+[Responses API guide](https://docs.x.ai/developers/model-capabilities/text/generate-text),
+and [Grok 4.3 model documentation](https://docs.x.ai/developers/models/grok-4.3).
 
 ## Planner effects
 
@@ -76,7 +79,8 @@ The policy suite covers representative preservation phrases, reserve/spend/cost
 normalization, contradictions, unsupported assets, bounds, executable
 configuration attempts, additional model fields, malformed model output,
 provider failure, strict Responses API request construction, refusal,
-incomplete output, invalid JSON, and sanitized upstream HTTP errors.
+incomplete output, invalid JSON, sanitized upstream HTTP errors, and provider-
+specific endpoint/configuration behavior.
 
 The planner suite additionally proves that a USDC reserve can reject the direct
 route and that a swap-cost cap can reject the WMON route. Existing deterministic
@@ -94,8 +98,8 @@ server-only `/api/preferences` endpoint.
 
 ## Phase 4C manual acceptance
 
-1. Add an OpenAI key locally as `OPENAI_API_KEY` if the live AI badge is part of
-   the test. Never paste or commit the key.
+1. Add the xAI key locally as `XAI_API_KEY` if the live AI badge is part of the
+   test. Never paste or commit the key.
 2. Create one fresh `0.1 USDC` invoice and open it with the payer wallet.
 3. Choose **Preserve MON**, compile the policy, and analyze wallet routes.
 4. Record balances, maximums, gas, swap cost, eligibility, scores, and rank.
