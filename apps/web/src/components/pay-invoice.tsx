@@ -16,6 +16,7 @@ import {
 } from "@blinkpay/core";
 import {
   buildPaymentPlans,
+  calculateSplitAmounts,
   type PaymentPlan,
   type PlannerResult,
   type PortfolioSnapshot,
@@ -105,6 +106,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
   const [account, setAccount] = useState<Address>();
   const [transactionHash, setTransactionHash] = useState<Hex>();
   const [swapQuote, setSwapQuote] = useState<SwapQuote>();
+  const [splitSwapQuote, setSplitSwapQuote] = useState<SwapQuote>();
   const [routeAnalysis, setRouteAnalysis] = useState<RouteAnalysis>();
   const [preferenceText, setPreferenceText] = useState("");
   const [activePolicy, setActivePolicy] = useState<ActivePolicy>(() => ({
@@ -121,6 +123,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
   useEffect(() => watchInjectedAccount((nextAccount) => {
     setAccount(nextAccount);
     setSwapQuote(undefined);
+    setSplitSwapQuote(undefined);
     setRouteAnalysis(undefined);
     setTransactionHash(undefined);
     setMessage(nextAccount
@@ -145,9 +148,13 @@ export function PayInvoice({ payload }: { payload?: string }) {
   const directPlan = routeAnalysis?.plans.find((plan) => plan.id === "direct-usdc");
   const swapPlan = routeAnalysis?.plans.find((plan) => plan.id === "swap-wmon");
   const vaultPlan = routeAnalysis?.plans.find((plan) => plan.id === "vault-usdc");
+  const splitSwapPlan = routeAnalysis?.plans.find((plan) => plan.id === "split-usdc-wmon");
+  const splitVaultPlan = routeAnalysis?.plans.find((plan) => plan.id === "split-usdc-vault");
   const directUnavailable = directPlan?.status === "unavailable";
   const swapUnavailable = swapPlan?.status === "unavailable";
   const vaultUnavailable = vaultPlan?.status === "unavailable";
+  const splitSwapUnavailable = splitSwapPlan?.status === "unavailable";
+  const splitVaultUnavailable = splitVaultPlan?.status === "unavailable";
   const expiry = new Date(Number(invoice.expiry) * 1_000).toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -180,6 +187,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
       const nextPolicy = parsePreferenceResponse(value);
       setActivePolicy(nextPolicy);
       setRouteAnalysis(undefined);
+      setSplitSwapQuote(undefined);
       setTransactionHash(undefined);
       setPolicyMessage(nextPolicy.warning
         ?? "Policy compiled. Analyze again to apply it to unchanged live route facts.");
@@ -248,7 +256,13 @@ export function PayInvoice({ payload }: { payload?: string }) {
       ]);
 
       const now = getCurrentUnixTime();
+      const splitAmounts = calculateSplitAmounts(
+        invoice.amount,
+        usdcBalance,
+        activePolicy.normalized.minimumUsdcReserve,
+      );
       let vaultFacts: VaultFacts | undefined;
+      let splitVaultFacts: VaultFacts | undefined;
       let vaultReadError: string | undefined;
       try {
         vaultFacts = await readVaultFacts({
@@ -261,17 +275,45 @@ export function PayInvoice({ payload }: { payload?: string }) {
       } catch (error) {
         vaultReadError = getErrorMessage(error);
       }
+      if (splitAmounts.available) {
+        try {
+          splitVaultFacts = await readVaultFacts({
+            client,
+            routerAddress,
+            account: wallet.account,
+            settlementToken: invoice.settlementToken,
+            invoiceAmount: splitAmounts.secondaryAmount,
+          });
+        } catch (error) {
+          vaultReadError = getErrorMessage(error);
+        }
+      }
       let quote: SwapQuote | undefined;
+      let shortfallQuote: SwapQuote | undefined;
       let quoteError: string | undefined;
+      let shortfallQuoteError: string | undefined;
       if (!invoiceAlreadyPaid && invoice.expiry >= now) {
         try {
           quote = await fetchSwapQuote(payload, wallet.account);
-          validateSwapQuote(quote, invoice);
+          validateSwapQuote(quote, invoice, invoice.amount);
         } catch (error) {
           quoteError = getErrorMessage(error);
         }
+        if (splitAmounts.available) {
+          try {
+            shortfallQuote = await fetchSwapQuote(
+              payload,
+              wallet.account,
+              splitAmounts.secondaryAmount,
+            );
+            validateSwapQuote(shortfallQuote, invoice, splitAmounts.secondaryAmount);
+          } catch (error) {
+            shortfallQuoteError = getErrorMessage(error);
+          }
+        }
       } else {
         quoteError = invoiceAlreadyPaid ? "Invoice is already paid" : "Invoice has expired";
+        shortfallQuoteError = quoteError;
       }
 
       const directSimulation = await simulateDirectCandidate({
@@ -303,6 +345,32 @@ export function PayInvoice({ payload }: { payload?: string }) {
         invoiceAlreadyPaid,
         now,
         facts: vaultFacts,
+      });
+      const splitSwapSimulation = await simulateSplitSwapCandidate({
+        client,
+        routerAddress,
+        account: wallet.account,
+        signedInvoice,
+        invoiceAlreadyPaid,
+        now,
+        directBalance: usdcBalance,
+        directAllowance: usdcAllowance,
+        wmonBalance,
+        wmonAllowance,
+        directAmount: splitAmounts.directAmount,
+        quote: shortfallQuote,
+      });
+      const splitVaultSimulation = await simulateSplitVaultCandidate({
+        client,
+        routerAddress,
+        account: wallet.account,
+        signedInvoice,
+        invoiceAlreadyPaid,
+        now,
+        directBalance: usdcBalance,
+        directAllowance: usdcAllowance,
+        directAmount: splitAmounts.directAmount,
+        facts: splitVaultFacts,
       });
 
       const portfolio: PortfolioSnapshot = {
@@ -337,6 +405,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
           allowance: wmonAllowance,
           ...(quote ? {
             quote: {
+              buyAmount: quote.buyAmount,
               estimatedSellAmount: quote.estimatedSellAmount ?? quote.maxSellAmount,
               maxSellAmount: quote.maxSellAmount,
               expiresAt: quote.expiresAt,
@@ -369,10 +438,36 @@ export function PayInvoice({ payload }: { payload?: string }) {
           readError: vaultReadError ?? "Vault facts are unavailable",
           simulation: vaultSimulation,
         },
+        split: {
+          swap: {
+            ...(shortfallQuote ? {
+              quote: {
+                buyAmount: shortfallQuote.buyAmount,
+                estimatedSellAmount: shortfallQuote.estimatedSellAmount
+                  ?? shortfallQuote.maxSellAmount,
+                maxSellAmount: shortfallQuote.maxSellAmount,
+                expiresAt: shortfallQuote.expiresAt,
+                ...(shortfallQuote.swapCostBps === undefined
+                  ? {}
+                  : { swapCostBps: shortfallQuote.swapCostBps }),
+              },
+            } : { quoteError: shortfallQuoteError ?? splitAmounts.reason ?? "No split quote" }),
+            simulation: splitSwapSimulation,
+          },
+          vault: splitVaultFacts ? {
+            previewShares: splitVaultFacts.previewShares,
+            maxShares: splitVaultFacts.maxShares,
+            simulation: splitVaultSimulation,
+          } : {
+            readError: vaultReadError ?? splitAmounts.reason ?? "No split vault preview",
+            simulation: splitVaultSimulation,
+          },
+        },
         preferences: plannerPreferences(activePolicy.normalized),
       });
 
       setSwapQuote(quote);
+      setSplitSwapQuote(shortfallQuote);
       setRouteAnalysis({ ...result, portfolio });
       const recommended = result.plans.find((plan) => plan.id === result.recommendedPlanId);
       setMessage(recommended
@@ -495,7 +590,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
       setMessage("Reading a server-validated exact-output quote from the testnet pool…");
 
       const quote = await fetchSwapQuote(payload, wallet.account);
-      validateSwapQuote(quote, invoice);
+      validateSwapQuote(quote, invoice, invoice.amount);
 
       setSwapQuote(quote);
       const maximum = formatUnits(quote.maxSellAmount, 18);
@@ -712,6 +807,265 @@ export function PayInvoice({ payload }: { payload?: string }) {
     }
   }
 
+  async function paySplitWithVault() {
+    setBusy(true);
+    setTransactionHash(undefined);
+
+    try {
+      if (!splitVaultPlan?.split || splitVaultPlan.status !== "eligible") {
+        throw new Error("Analyze routes before using the direct plus vault split");
+      }
+      const routerAddress = getConfiguredRouterAddress();
+      const signatureValid = await verifyTypedData({
+        address: invoice.merchant,
+        signature,
+        ...buildInvoiceTypedData(invoice, routerAddress),
+      });
+      if (!signatureValid) throw new Error("Merchant signature is invalid for this router");
+
+      const wallet = await connectInjectedWallet();
+      const client = createMonadPublicClient(activeMonadNetwork);
+      setAccount(wallet.account);
+      setMessage("Rechecking both split legs and the protected vault maximum…");
+
+      const [alreadyPaid, usdcBalance, usdcAllowance] = await Promise.all([
+        client.readContract({
+          address: routerAddress,
+          abi: blinkPayRouterAbi,
+          functionName: "paidInvoices",
+          args: [invoice.invoiceId],
+        }),
+        client.readContract({
+          address: invoice.settlementToken,
+          abi: erc20Abi,
+          functionName: "balanceOf",
+          args: [wallet.account],
+        }),
+        client.readContract({
+          address: invoice.settlementToken,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [wallet.account, routerAddress],
+        }),
+      ]);
+      if (alreadyPaid) throw new Error("This invoice has already been paid");
+      const amounts = calculateSplitAmounts(
+        invoice.amount,
+        usdcBalance,
+        activePolicy.normalized.minimumUsdcReserve,
+      );
+      if (!amounts.available) throw new Error(amounts.reason ?? "Split is unavailable");
+      if (amounts.directAmount !== splitVaultPlan.split.directAmount) {
+        throw new Error("Wallet USDC changed. Analyze routes again before paying");
+      }
+      const facts = await readVaultFacts({
+        client,
+        routerAddress,
+        account: wallet.account,
+        settlementToken: invoice.settlementToken,
+        invoiceAmount: amounts.secondaryAmount,
+      });
+      if (!facts.verified || !facts.assetMatches) throw new Error("Vault verification failed");
+      if (facts.maxWithdraw < amounts.secondaryAmount || facts.shares < facts.maxShares) {
+        throw new Error("The vault cannot fund the exact split shortfall");
+      }
+
+      if (usdcAllowance < amounts.directAmount) {
+        setMessage(`Approve ${formatUnits(amounts.directAmount, 6)} direct USDC…`);
+        const approvalHash = await wallet.walletClient.writeContract({
+          address: invoice.settlementToken,
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [routerAddress, amounts.directAmount],
+          account: wallet.account,
+          chain: activeMonadChain,
+        });
+        await client.waitForTransactionReceipt({ hash: approvalHash });
+      }
+      if (facts.allowance < facts.maxShares) {
+        setMessage(`Approve at most ${formatUnits(facts.maxShares, facts.shareDecimals)} vault shares…`);
+        const approvalHash = await wallet.walletClient.writeContract({
+          address: facts.address,
+          abi: erc4626Abi,
+          functionName: "approve",
+          args: [routerAddress, facts.maxShares],
+          account: wallet.account,
+          chain: activeMonadChain,
+        });
+        await client.waitForTransactionReceipt({ hash: approvalHash });
+      }
+
+      setMessage("Both approvals are safe. Simulating one atomic split transaction…");
+      await client.estimateContractGas({
+        address: routerAddress,
+        abi: blinkPayRouterAbi,
+        functionName: "paySplitWithVault",
+        args: [invoice, signature, amounts.directAmount, facts.maxShares],
+        account: wallet.account,
+      });
+      const paymentHash = await wallet.walletClient.writeContract({
+        address: routerAddress,
+        abi: blinkPayRouterAbi,
+        functionName: "paySplitWithVault",
+        args: [invoice, signature, amounts.directAmount, facts.maxShares],
+        account: wallet.account,
+        chain: activeMonadChain,
+      });
+      const receipt = await client.waitForTransactionReceipt({ hash: paymentHash });
+      if (receipt.status !== "success") throw new Error("Atomic split transaction reverted");
+
+      setTransactionHash(paymentHash);
+      setMessage(
+        `Paid ${formatUnits(amounts.directAmount, 6)} wallet USDC + ${formatUnits(amounts.secondaryAmount, 6)} vault USDC atomically.`,
+      );
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function paySplitWithWmon() {
+    setBusy(true);
+    setTransactionHash(undefined);
+
+    try {
+      if (!splitSwapQuote || !splitSwapPlan?.split || splitSwapPlan.status !== "eligible") {
+        throw new Error("Analyze routes before using the direct plus WMON split");
+      }
+      const now = getCurrentUnixTime();
+      if (splitSwapQuote.expiresAt <= now) {
+        setSplitSwapQuote(undefined);
+        throw new Error("The split quote expired. Analyze routes again");
+      }
+      const routerAddress = getConfiguredRouterAddress();
+      const signatureValid = await verifyTypedData({
+        address: invoice.merchant,
+        signature,
+        ...buildInvoiceTypedData(invoice, routerAddress),
+      });
+      if (!signatureValid) throw new Error("Merchant signature is invalid for this router");
+
+      const wallet = await connectInjectedWallet();
+      const client = createMonadPublicClient(activeMonadNetwork);
+      setAccount(wallet.account);
+      setMessage("Rechecking direct USDC, WMON maximum, and both allowances…");
+      const [alreadyPaid, usdcBalance, usdcAllowance, wmonBalance, wmonAllowance] =
+        await Promise.all([
+          client.readContract({
+            address: routerAddress,
+            abi: blinkPayRouterAbi,
+            functionName: "paidInvoices",
+            args: [invoice.invoiceId],
+          }),
+          client.readContract({
+            address: invoice.settlementToken,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [wallet.account],
+          }),
+          client.readContract({
+            address: invoice.settlementToken,
+            abi: erc20Abi,
+            functionName: "allowance",
+            args: [wallet.account, routerAddress],
+          }),
+          client.readContract({
+            address: splitSwapQuote.sellToken,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [wallet.account],
+          }),
+          client.readContract({
+            address: splitSwapQuote.sellToken,
+            abi: erc20Abi,
+            functionName: "allowance",
+            args: [wallet.account, routerAddress],
+          }),
+        ]);
+      if (alreadyPaid) throw new Error("This invoice has already been paid");
+      const amounts = calculateSplitAmounts(
+        invoice.amount,
+        usdcBalance,
+        activePolicy.normalized.minimumUsdcReserve,
+      );
+      if (!amounts.available) throw new Error(amounts.reason ?? "Split is unavailable");
+      if (
+        amounts.directAmount !== splitSwapPlan.split.directAmount
+          || splitSwapQuote.buyAmount !== amounts.secondaryAmount
+      ) throw new Error("Wallet balance or split shortfall changed. Analyze routes again");
+      if (wmonBalance < splitSwapQuote.maxSellAmount) {
+        throw new Error("WMON balance does not cover the protected split maximum");
+      }
+
+      if (usdcAllowance < amounts.directAmount) {
+        setMessage(`Approve ${formatUnits(amounts.directAmount, 6)} direct USDC…`);
+        const approvalHash = await wallet.walletClient.writeContract({
+          address: invoice.settlementToken,
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [routerAddress, amounts.directAmount],
+          account: wallet.account,
+          chain: activeMonadChain,
+        });
+        await client.waitForTransactionReceipt({ hash: approvalHash });
+      }
+      if (wmonAllowance < splitSwapQuote.maxSellAmount) {
+        setMessage(`Approve at most ${formatUnits(splitSwapQuote.maxSellAmount, 18)} WMON…`);
+        const approvalHash = await wallet.walletClient.writeContract({
+          address: splitSwapQuote.sellToken,
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [routerAddress, splitSwapQuote.maxSellAmount],
+          account: wallet.account,
+          chain: activeMonadChain,
+        });
+        await client.waitForTransactionReceipt({ hash: approvalHash });
+      }
+      if (splitSwapQuote.expiresAt <= getCurrentUnixTime()) {
+        setSplitSwapQuote(undefined);
+        throw new Error("The split quote expired after approval. Analyze again; both caps remain safe");
+      }
+
+      setMessage("Both approvals are safe. Simulating one atomic split transaction…");
+      const args = [
+        invoice,
+        signature,
+        amounts.directAmount,
+        splitSwapQuote.maxSellAmount,
+        splitSwapQuote.expiresAt,
+        splitSwapQuote.swapCallData,
+      ] as const;
+      await client.estimateContractGas({
+        address: routerAddress,
+        abi: blinkPayRouterAbi,
+        functionName: "paySplitWithSwap",
+        args,
+        account: wallet.account,
+      });
+      const paymentHash = await wallet.walletClient.writeContract({
+        address: routerAddress,
+        abi: blinkPayRouterAbi,
+        functionName: "paySplitWithSwap",
+        args,
+        account: wallet.account,
+        chain: activeMonadChain,
+      });
+      const receipt = await client.waitForTransactionReceipt({ hash: paymentHash });
+      if (receipt.status !== "success") throw new Error("Atomic split transaction reverted");
+
+      setTransactionHash(paymentHash);
+      setSplitSwapQuote(undefined);
+      setMessage(
+        `Paid ${formatUnits(amounts.directAmount, 6)} wallet USDC + ${formatUnits(amounts.secondaryAmount, 6)} USDC bought from WMON atomically.`,
+      );
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="checkoutShell" aria-labelledby="pay-title">
       <div className="checkoutIntro compactIntro">
@@ -804,7 +1158,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
         <section className="routePlanner" aria-labelledby="route-planner-title">
           <div className="routePlannerHeader">
             <div>
-              <p className="cardLabel">Phase 3 · Deterministic planner</p>
+              <p className="cardLabel">Phase 6 · Deterministic atomic planner</p>
               <h2 id="route-planner-title">Compare live payment evidence.</h2>
             </div>
             <button className="secondaryButton" type="button" onClick={analyzeRoutes} disabled={busy}>
@@ -965,6 +1319,70 @@ export function PayInvoice({ payload }: { payload?: string }) {
               {vaultUnavailable ? "Route unavailable" : busy ? "Preflighting…" : "Pay from vault"}
             </button>
           </article>
+
+          <article
+            className={`routeCard ${
+              routeAnalysis?.recommendedPlanId === "split-usdc-vault" ? "featuredRoute" : ""
+            }`}
+          >
+            <p className="cardLabel">Route 04 · Atomic split</p>
+            <h2>USDC + vault</h2>
+            <p>Use spendable wallet USDC first, then redeem exactly the remaining shortfall.</p>
+            {splitVaultPlan?.split ? (
+              <div className="quoteFacts">
+                <span>One atomic transaction</span>
+                <strong>{formatUnits(splitVaultPlan.split.directAmount, 6)} wallet USDC</strong>
+                <small>+ {formatUnits(splitVaultPlan.split.secondaryAmount, 6)} USDC from vault</small>
+              </div>
+            ) : null}
+            <button
+              className="primaryButton"
+              type="button"
+              onClick={paySplitWithVault}
+              disabled={busy || splitVaultUnavailable || !splitVaultPlan}
+            >
+              {splitVaultUnavailable
+                ? "Route unavailable"
+                : busy ? "Preflighting…" : "Pay with USDC + vault"}
+            </button>
+          </article>
+
+          <article
+            className={`routeCard ${
+              routeAnalysis?.recommendedPlanId === "split-usdc-wmon" ? "featuredRoute" : ""
+            }`}
+          >
+            <p className="cardLabel">Route 05 · Atomic split</p>
+            <h2>USDC + WMON</h2>
+            <p>Use spendable wallet USDC first, then buy only the remaining USDC shortfall.</p>
+            {splitSwapPlan?.split && splitSwapQuote ? (
+              <div className="quoteFacts">
+                <span>{formatUnits(splitSwapPlan.split.directAmount, 6)} wallet USDC + WMON</span>
+                <strong>Max {formatUnits(splitSwapQuote.maxSellAmount, 18)} WMON</strong>
+                <small>Buys exactly {formatUnits(splitSwapPlan.split.secondaryAmount, 6)} USDC</small>
+              </div>
+            ) : null}
+            <div className="routeActions">
+              <button
+                className="secondaryButton"
+                type="button"
+                onClick={analyzeRoutes}
+                disabled={busy}
+              >
+                {splitSwapQuote ? "Refresh split quote" : "Analyze split quote"}
+              </button>
+              {splitSwapQuote ? (
+                <button
+                  className="primaryButton"
+                  type="button"
+                  onClick={paySplitWithWmon}
+                  disabled={busy || splitSwapUnavailable}
+                >
+                  {splitSwapUnavailable ? "Route unavailable" : "Pay with USDC + WMON"}
+                </button>
+              ) : null}
+            </div>
+          </article>
         </div>
 
         <p className="formMessage" role="status">{message}</p>
@@ -985,23 +1403,31 @@ export function PayInvoice({ payload }: { payload?: string }) {
 
 type MonadPublicClient = ReturnType<typeof createMonadPublicClient>;
 
-async function fetchSwapQuote(payload: string | undefined, payer: Address): Promise<SwapQuote> {
+async function fetchSwapQuote(
+  payload: string | undefined,
+  payer: Address,
+  buyAmount?: bigint,
+): Promise<SwapQuote> {
   if (!payload) throw new Error("Invoice payload is unavailable");
   const response = await fetch("/api/quote", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ invoicePayload: payload, payer }),
+    body: JSON.stringify({
+      invoicePayload: payload,
+      payer,
+      ...(buyAmount === undefined ? {} : { buyAmount: buyAmount.toString() }),
+    }),
   });
   const value: unknown = await response.json();
   if (!response.ok) throw new Error(readQuoteError(value));
   return parseSwapQuote(value);
 }
 
-function validateSwapQuote(quote: SwapQuote, invoice: Invoice): void {
+function validateSwapQuote(quote: SwapQuote, invoice: Invoice, expectedBuyAmount: bigint): void {
   if (quote.sellToken !== getAddress(activeWmonAddress)) {
     throw new Error("Quote sell token is not canonical WMON");
   }
-  if (quote.buyAmount !== invoice.amount) throw new Error("Quote changed the invoice amount");
+  if (quote.buyAmount !== expectedBuyAmount) throw new Error("Quote changed the requested output amount");
   if (quote.expiresAt > invoice.expiry) throw new Error("Quote outlives the signed invoice");
 }
 
@@ -1182,22 +1608,122 @@ async function simulateVaultCandidate(input: {
   }
 }
 
+async function simulateSplitSwapCandidate(input: {
+  client: MonadPublicClient;
+  routerAddress: Address;
+  account: Address;
+  signedInvoice: SignedInvoice;
+  invoiceAlreadyPaid: boolean;
+  now: bigint;
+  directBalance: bigint;
+  directAllowance: bigint;
+  wmonBalance: bigint;
+  wmonAllowance: bigint;
+  directAmount: bigint;
+  quote?: SwapQuote;
+}): Promise<SimulationResult> {
+  const { invoice, signature } = input.signedInvoice;
+  const quote = input.quote;
+  if (
+    input.invoiceAlreadyPaid || invoice.expiry < input.now || input.directAmount === 0n
+      || input.directAmount >= invoice.amount || input.directBalance < input.directAmount
+      || !quote || quote.buyAmount !== invoice.amount - input.directAmount
+      || quote.expiresAt <= input.now || input.wmonBalance < quote.maxSellAmount
+  ) {
+    return { status: "not-run" };
+  }
+  if (
+    input.directAllowance < input.directAmount
+      || input.wmonAllowance < quote.maxSellAmount
+  ) return { status: "requires-approval" };
+
+  try {
+    const gasEstimate = await input.client.estimateContractGas({
+      address: input.routerAddress,
+      abi: blinkPayRouterAbi,
+      functionName: "paySplitWithSwap",
+      args: [
+        invoice,
+        signature,
+        input.directAmount,
+        quote.maxSellAmount,
+        quote.expiresAt,
+        quote.swapCallData,
+      ],
+      account: input.account,
+    });
+    return { status: "passed", gasEstimate };
+  } catch (error) {
+    return { status: "failed", reason: getErrorMessage(error) };
+  }
+}
+
+async function simulateSplitVaultCandidate(input: {
+  client: MonadPublicClient;
+  routerAddress: Address;
+  account: Address;
+  signedInvoice: SignedInvoice;
+  invoiceAlreadyPaid: boolean;
+  now: bigint;
+  directBalance: bigint;
+  directAllowance: bigint;
+  directAmount: bigint;
+  facts?: VaultFacts;
+}): Promise<SimulationResult> {
+  const { invoice, signature } = input.signedInvoice;
+  const facts = input.facts;
+  const shortfall = invoice.amount - input.directAmount;
+  if (
+    input.invoiceAlreadyPaid || invoice.expiry < input.now || input.directAmount === 0n
+      || input.directAmount >= invoice.amount || input.directBalance < input.directAmount
+      || !facts || !facts.verified || !facts.assetMatches || facts.maxWithdraw < shortfall
+      || facts.shares < facts.maxShares || facts.maxShares === 0n
+  ) {
+    return { status: "not-run" };
+  }
+  if (
+    input.directAllowance < input.directAmount || facts.allowance < facts.maxShares
+  ) return { status: "requires-approval" };
+
+  try {
+    const gasEstimate = await input.client.estimateContractGas({
+      address: input.routerAddress,
+      abi: blinkPayRouterAbi,
+      functionName: "paySplitWithVault",
+      args: [invoice, signature, input.directAmount, facts.maxShares],
+      account: input.account,
+    });
+    return { status: "passed", gasEstimate };
+  } catch (error) {
+    return { status: "failed", reason: getErrorMessage(error) };
+  }
+}
+
 function addBasisPointBuffer(amount: bigint, basisPoints: bigint): bigint {
   if (amount <= 0n) return 0n;
   return amount + (amount * basisPoints + 9_999n) / 10_000n;
 }
 
 function formatPlanUnits(plan: PaymentPlan, amount: bigint): string {
-  return `${formatUnits(amount, plan.decimals)} ${formatFundingAsset(plan)}`;
+  const unit = plan.kind === "direct-exact-output-swap"
+    ? "WMON"
+    : plan.kind === "direct-erc4626-withdraw"
+      ? "USDC vault shares"
+      : formatFundingAsset(plan);
+  return `${formatUnits(amount, plan.decimals)} ${unit}`;
 }
 
 function formatFundingAsset(plan: PaymentPlan): string {
+  if (plan.fundingAsset === "USDC_WMON") return "USDC + WMON";
+  if (plan.fundingAsset === "USDC_VAULT_USDC") return "USDC + vault shares";
   return plan.fundingAsset === "VAULT_USDC" ? "USDC vault shares" : plan.fundingAsset;
 }
 
 function formatRouteKind(plan: PaymentPlan): string {
   if (plan.kind === "direct") return "Direct";
   if (plan.kind === "erc4626-withdraw") return "Exact redeem";
+  if (plan.kind === "direct-erc4626-withdraw") return "Atomic split";
+  if (plan.kind === "direct-exact-output-swap") return "Atomic split";
   return "Exact output";
 }
 
@@ -1286,6 +1812,9 @@ function formatPlanMaximum(plan: PaymentPlan): string {
 
 function formatApprovalStatus(plan: PaymentPlan): string {
   if (!hasExecutableQuote(plan)) return "Not applicable";
+  if (plan.split) return plan.cost.approvalTransactions === 0
+    ? "Both sufficient"
+    : `${plan.cost.approvalTransactions} required`;
   return plan.approvalRequired ? "Required" : "Already sufficient";
 }
 
@@ -1294,7 +1823,8 @@ function formatSwapCost(plan: PaymentPlan): string {
 }
 
 function hasExecutableQuote(plan: PaymentPlan): boolean {
-  return plan.kind !== "exact-output-swap" || plan.quoteExpiresAt !== undefined;
+  return (plan.kind !== "exact-output-swap" && plan.kind !== "direct-exact-output-swap")
+    || plan.quoteExpiresAt !== undefined;
 }
 
 function parseSwapQuote(value: unknown): SwapQuote {

@@ -30,6 +30,7 @@ import {
 type QuoteRequestBody = {
   invoicePayload?: unknown;
   payer?: unknown;
+  buyAmount?: unknown;
 };
 
 const TESTNET_QUOTE_TTL_SECONDS = 180n;
@@ -40,6 +41,9 @@ export async function POST(request: Request) {
     const invoicePayload = requireString(body.invoicePayload, "invoicePayload");
     const payer = requireRequestAddress(body.payer, "payer");
     const { invoice } = decodeInvoiceRequest(invoicePayload);
+    const buyAmount = body.buyAmount === undefined
+      ? invoice.amount
+      : requirePositiveBigInt(body.buyAmount, "buyAmount");
     const configuredRouter = process.env.NEXT_PUBLIC_BLINKPAY_ROUTER_ADDRESS
       ?? (activeMonadNetwork === "testnet" ? blinkPayTestnetDeployment.router : undefined);
     const router = requireAddress(
@@ -53,12 +57,15 @@ export async function POST(request: Request) {
     if (invoice.settlementToken !== getAddress(activeUsdcAddress)) {
       throw new RequestError("Invoice settlement token is not canonical Monad USDC");
     }
+    if (buyAmount > invoice.amount) {
+      throw new RequestError("Quote amount cannot exceed the signed invoice amount");
+    }
 
     const now = BigInt(Math.floor(Date.now() / 1_000));
     if (invoice.expiry <= now + 5n) throw new RequestError("Invoice expires too soon to quote safely");
 
     if (activeMonadNetwork === "testnet") {
-      return NextResponse.json(await createTestnetQuote(invoice.amount, invoice.expiry, router));
+      return NextResponse.json(await createTestnetQuote(buyAmount, invoice.expiry, router));
     }
 
     const apiKey = process.env.ZEROX_API_KEY?.trim();
@@ -69,7 +76,7 @@ export async function POST(request: Request) {
         chainId: monadMainnet.id,
         sellToken: wmonAddresses.mainnet,
         buyToken: invoice.settlementToken,
-        buyAmount: invoice.amount,
+        buyAmount,
         taker: router,
         txOrigin: payer,
         recipient: router,
@@ -247,6 +254,15 @@ async function readBody(request: Request): Promise<QuoteRequestBody> {
 function requireString(value: unknown, field: string): string {
   if (typeof value !== "string" || !value) throw new RequestError(`${field} is required`);
   return value;
+}
+
+function requirePositiveBigInt(value: unknown, field: string): bigint {
+  if (typeof value !== "string" || !/^\d+$/u.test(value)) {
+    throw new RequestError(`${field} must be a positive integer string`);
+  }
+  const parsed = BigInt(value);
+  if (parsed <= 0n) throw new RequestError(`${field} must be positive`);
+  return parsed;
 }
 
 function decodeInvoiceRequest(payload: string) {

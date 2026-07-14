@@ -14,6 +14,8 @@ export const blinkPayRouterAbi = parseAbi([
   "function payDirect(Invoice invoice, bytes merchantSignature)",
   "function payWithSwap(Invoice invoice, bytes merchantSignature, uint256 maxSellAmount, uint256 quoteDeadline, bytes swapCallData)",
   "function payFromVault(Invoice invoice, bytes merchantSignature, uint256 maxShares)",
+  "function paySplitWithVault(Invoice invoice, bytes merchantSignature, uint256 directAmount, uint256 maxShares)",
+  "function paySplitWithSwap(Invoice invoice, bytes merchantSignature, uint256 directAmount, uint256 maxSellAmount, uint256 quoteDeadline, bytes swapCallData)",
   "function paidInvoices(bytes32 invoiceId) view returns (bool)",
   "function settlementAsset() view returns (address)",
   "function sellAsset() view returns (address)",
@@ -23,6 +25,8 @@ export const blinkPayRouterAbi = parseAbi([
   "function allowedSwapSelectors(bytes4 selector) view returns (bool)",
   "event PaymentSettled(bytes32 indexed invoiceId, address indexed payer, address indexed merchant, address settlementToken, uint256 settlementAmount, uint256 merchantNonce)",
   "event VaultPaymentSettled(bytes32 indexed invoiceId, address indexed payer, address indexed vault, uint256 settlementAmount, uint256 maximumShares, uint256 sharesRedeemed)",
+  "event DirectVaultSplitSettled(bytes32 indexed invoiceId, address indexed payer, address indexed vault, uint256 directAmount, uint256 vaultAmount, uint256 maximumShares, uint256 sharesRedeemed)",
+  "event DirectSwapSplitSettled(bytes32 indexed invoiceId, address indexed payer, address indexed sellToken, uint256 directAmount, uint256 swapOutputAmount, uint256 maximumSellAmount, uint256 actualSellAmount, uint256 refundedSellAmount)",
 ]);
 
 export const erc4626Abi = parseAbi([
