@@ -68,14 +68,7 @@ contract BlinkPayVaultRouter is BlinkPaySwapRouter {
         uint256 sharesRedeemed = _redeemExactAssets(msg.sender, invoice.amount, maxShares);
         _settleMerchantFromRouter(invoice);
 
-        emit PaymentSettled(
-            invoice.invoiceId,
-            msg.sender,
-            invoice.merchant,
-            invoice.settlementToken,
-            invoice.amount,
-            invoice.nonce
-        );
+        _emitPaymentSettled(invoice, msg.sender);
         emit VaultPaymentSettled(
             invoice.invoiceId,
             msg.sender,
@@ -87,7 +80,7 @@ contract BlinkPayVaultRouter is BlinkPaySwapRouter {
     }
 
     function _redeemExactAssets(address payer, uint256 assets, uint256 maxShares)
-        private
+        internal
         returns (uint256 observedShares)
     {
         uint256 availableAssets = vaultAsset.maxWithdraw(payer);

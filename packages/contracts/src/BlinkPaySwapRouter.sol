@@ -70,17 +70,7 @@ contract BlinkPaySwapRouter is BlinkPayRouter {
         bytes calldata swapCallData
     ) external nonReentrant {
         _validateInvoice(invoice, merchantSignature);
-        if (maxSellAmount == 0) revert InvalidMaxSellAmount();
-        if (quoteDeadline > invoice.expiry) {
-            revert InvalidQuoteDeadline(quoteDeadline, invoice.expiry);
-        }
-        if (quoteDeadline < block.timestamp) {
-            revert SwapQuoteExpired(quoteDeadline, block.timestamp);
-        }
-        if (swapCallData.length < 4) revert SwapCallDataTooShort();
-
-        bytes4 selector = bytes4(swapCallData[:4]);
-        if (!allowedSwapSelectors[selector]) revert SwapSelectorNotAllowed(selector);
+        _validateSwapRequest(maxSellAmount, quoteDeadline, invoice.expiry, swapCallData);
 
         paidInvoices[invoice.invoiceId] = true;
         (uint256 actualSellAmount, uint256 refund) =
@@ -89,14 +79,7 @@ contract BlinkPaySwapRouter is BlinkPayRouter {
 
         if (refund != 0) sellAsset.safeTransfer(msg.sender, refund);
 
-        emit PaymentSettled(
-            invoice.invoiceId,
-            msg.sender,
-            invoice.merchant,
-            invoice.settlementToken,
-            invoice.amount,
-            invoice.nonce
-        );
+        _emitPaymentSettled(invoice, msg.sender);
         emit SwapPaymentSettled(
             invoice.invoiceId,
             msg.sender,
@@ -107,11 +90,30 @@ contract BlinkPaySwapRouter is BlinkPayRouter {
         );
     }
 
+    function _validateSwapRequest(
+        uint256 maxSellAmount,
+        uint256 quoteDeadline,
+        uint256 invoiceExpiry,
+        bytes calldata swapCallData
+    ) internal view {
+        if (maxSellAmount == 0) revert InvalidMaxSellAmount();
+        if (quoteDeadline > invoiceExpiry) {
+            revert InvalidQuoteDeadline(quoteDeadline, invoiceExpiry);
+        }
+        if (quoteDeadline < block.timestamp) {
+            revert SwapQuoteExpired(quoteDeadline, block.timestamp);
+        }
+        if (swapCallData.length < 4) revert SwapCallDataTooShort();
+
+        bytes4 selector = bytes4(swapCallData[:4]);
+        if (!allowedSwapSelectors[selector]) revert SwapSelectorNotAllowed(selector);
+    }
+
     function _executeSwap(
         uint256 maxSellAmount,
         uint256 expectedOutput,
         bytes calldata swapCallData
-    ) private returns (uint256 actualSellAmount, uint256 refund) {
+    ) internal returns (uint256 actualSellAmount, uint256 refund) {
         uint256 sellBalanceBefore = sellAsset.balanceOf(address(this));
         uint256 settlementBalanceBefore = settlementAsset.balanceOf(address(this));
 

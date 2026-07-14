@@ -34,6 +34,7 @@ contract BlinkPayRouter is EIP712, ReentrancyGuard {
     mapping(bytes32 invoiceId => bool paid) public paidInvoices;
 
     error EmptyInvoiceId();
+    error InexactFundingInput(uint256 expected, uint256 received);
     error InexactSettlement(uint256 expected, uint256 received);
     error InvalidAmount();
     error InvalidChainId(uint256 expected, uint256 received);
@@ -79,14 +80,7 @@ contract BlinkPayRouter is EIP712, ReentrancyGuard {
             : 0;
         if (received != invoice.amount) revert InexactSettlement(invoice.amount, received);
 
-        emit PaymentSettled(
-            invoice.invoiceId,
-            msg.sender,
-            invoice.merchant,
-            invoice.settlementToken,
-            invoice.amount,
-            invoice.nonce
-        );
+        _emitPaymentSettled(invoice, msg.sender);
     }
 
     /// @notice Returns the exact EIP-712 digest a merchant must sign.
@@ -143,5 +137,25 @@ contract BlinkPayRouter is EIP712, ReentrancyGuard {
             ? merchantBalanceAfter - merchantBalanceBefore
             : 0;
         if (received != invoice.amount) revert InexactSettlement(invoice.amount, received);
+    }
+
+    /// @dev Pulls an exact settlement-token contribution into the router.
+    function _pullSettlementToRouter(address payer, uint256 amount) internal {
+        uint256 balanceBefore = settlementAsset.balanceOf(address(this));
+        settlementAsset.safeTransferFrom(payer, address(this), amount);
+        uint256 balanceAfter = settlementAsset.balanceOf(address(this));
+        uint256 received = balanceAfter >= balanceBefore ? balanceAfter - balanceBefore : 0;
+        if (received != amount) revert InexactFundingInput(amount, received);
+    }
+
+    function _emitPaymentSettled(Invoice calldata invoice, address payer) internal {
+        emit PaymentSettled(
+            invoice.invoiceId,
+            payer,
+            invoice.merchant,
+            invoice.settlementToken,
+            invoice.amount,
+            invoice.nonce
+        );
     }
 }

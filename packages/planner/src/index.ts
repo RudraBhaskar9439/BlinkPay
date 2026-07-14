@@ -1,5 +1,15 @@
-export type FundingAsset = "USDC" | "WMON" | "VAULT_USDC";
-export type RouteKind = "direct" | "exact-output-swap" | "erc4626-withdraw";
+export type FundingAsset =
+  | "USDC"
+  | "WMON"
+  | "VAULT_USDC"
+  | "USDC_WMON"
+  | "USDC_VAULT_USDC";
+export type RouteKind =
+  | "direct"
+  | "exact-output-swap"
+  | "erc4626-withdraw"
+  | "direct-exact-output-swap"
+  | "direct-erc4626-withdraw";
 export type PlanStatus = "eligible" | "unavailable";
 export type ConstraintStatus = "pass" | "pending" | "fail";
 
@@ -38,6 +48,7 @@ export type ConstraintResult = {
     | "vault-verified"
     | "vault-asset"
     | "vault-liquidity"
+    | "split-required"
     | "simulation";
   label: string;
   status: ConstraintStatus;
@@ -59,7 +70,12 @@ export type RouteCost = {
 };
 
 export type PaymentPlan = {
-  id: "direct-usdc" | "swap-wmon" | "vault-usdc";
+  id:
+    | "direct-usdc"
+    | "swap-wmon"
+    | "vault-usdc"
+    | "split-usdc-wmon"
+    | "split-usdc-vault";
   kind: RouteKind;
   fundingAsset: FundingAsset;
   decimals: number;
@@ -71,6 +87,14 @@ export type PaymentPlan = {
   balance: bigint;
   allowance: bigint;
   approvalRequired: boolean;
+  split?: {
+    directAmount: bigint;
+    secondaryAmount: bigint;
+    directAllowance: bigint;
+    secondaryAllowance: bigint;
+    directApprovalRequired: boolean;
+    secondaryApprovalRequired: boolean;
+  };
   quoteExpiresAt?: bigint;
   simulation: SimulationResult;
   steps: RouteStep[];
@@ -80,6 +104,7 @@ export type PaymentPlan = {
 };
 
 export type SwapQuoteSnapshot = {
+  buyAmount: bigint;
   estimatedSellAmount: bigint;
   maxSellAmount: bigint;
   expiresAt: bigint;
@@ -116,6 +141,19 @@ export type PlannerInput = {
     readError?: string;
     simulation: SimulationResult;
   };
+  split?: {
+    swap: {
+      quote?: SwapQuoteSnapshot;
+      quoteError?: string;
+      simulation: SimulationResult;
+    };
+    vault: {
+      previewShares?: bigint;
+      maxShares?: bigint;
+      readError?: string;
+      simulation: SimulationResult;
+    };
+  };
   preferences?: {
     preferredFundingAsset?: FundingAsset;
     maxWmonSpend?: bigint;
@@ -133,11 +171,19 @@ const APPROVAL_GAS_UNITS = 65_000n;
 const DIRECT_GAS_UNITS = 120_000n;
 const SWAP_GAS_UNITS = 400_000n;
 const VAULT_GAS_UNITS = 260_000n;
+const SPLIT_SWAP_GAS_UNITS = 450_000n;
+const SPLIT_VAULT_GAS_UNITS = 310_000n;
 
 export function buildPaymentPlans(input: PlannerInput): PlannerResult {
   validateInput(input);
 
-  const plans = [buildDirectPlan(input), buildSwapPlan(input), buildVaultPlan(input)];
+  const plans = [
+    buildDirectPlan(input),
+    buildSwapPlan(input),
+    buildVaultPlan(input),
+    buildSplitSwapPlan(input),
+    buildSplitVaultPlan(input),
+  ];
   const eligiblePlans = plans
     .filter((plan) => plan.status === "eligible")
     .sort(comparePlans);
@@ -155,6 +201,316 @@ export function buildPaymentPlans(input: PlannerInput): PlannerResult {
   return {
     plans,
     ...(recommended ? { recommendedPlanId: recommended.id } : {}),
+  };
+}
+
+export function calculateSplitAmounts(
+  invoiceAmount: bigint,
+  usdcBalance: bigint,
+  minimumUsdcReserve = 0n,
+): { directAmount: bigint; secondaryAmount: bigint; available: boolean; reason?: string } {
+  if (invoiceAmount <= 0n) throw new Error("Invoice amount must be positive");
+  if (usdcBalance < 0n || minimumUsdcReserve < 0n) {
+    throw new Error("Split balances cannot be negative");
+  }
+  const spendable = usdcBalance > minimumUsdcReserve
+    ? usdcBalance - minimumUsdcReserve
+    : 0n;
+  const directAmount = spendable < invoiceAmount ? spendable : invoiceAmount;
+  const secondaryAmount = invoiceAmount - directAmount;
+  if (directAmount === 0n) {
+    return {
+      directAmount,
+      secondaryAmount,
+      available: false,
+      reason: "No wallet USDC is spendable after preserving the configured reserve",
+    };
+  }
+  if (secondaryAmount === 0n) {
+    return {
+      directAmount,
+      secondaryAmount,
+      available: false,
+      reason: "Wallet USDC can fund the invoice without a secondary route",
+    };
+  }
+  return { directAmount, secondaryAmount, available: true };
+}
+
+function buildSplitSwapPlan(input: PlannerInput): PaymentPlan {
+  const amounts = calculateSplitAmounts(
+    input.invoiceAmount,
+    input.direct.balance,
+    input.preferences?.minimumUsdcReserve,
+  );
+  const quote = input.split?.swap.quote;
+  const maximumSpend = quote?.maxSellAmount ?? 0n;
+  const directApprovalRequired = amounts.available
+    && input.direct.allowance < amounts.directAmount;
+  const secondaryApprovalRequired = amounts.available && quote !== undefined
+    && input.swap.allowance < maximumSpend;
+  const approvalCount = Number(directApprovalRequired) + Number(secondaryApprovalRequired);
+  const terminalReason = input.invoiceAlreadyPaid
+    ? "Skipped because the router reports this invoice paid"
+    : input.invoiceExpiry < input.now
+      ? "Skipped because the invoice has expired"
+      : undefined;
+  const inactiveReason = terminalReason ?? (!amounts.available ? amounts.reason : undefined);
+  const constraints = commonConstraints(input);
+  constraints.push(splitRequiredConstraint(amounts));
+  constraints.push({
+    id: "usdc-reserve",
+    label: "Split preserves the configured USDC reserve",
+    status: amounts.available ? "pass" : "pending",
+    evidence: amounts.available
+      ? `${input.direct.balance - amounts.directAmount} remains after ${amounts.directAmount} direct`
+      : (amounts.reason ?? "Split is not required"),
+  });
+  constraints.push({
+    id: "quote-available",
+    label: "Exact-output quote covers only the split shortfall",
+    status: inactiveReason
+      ? "pending"
+      : quote?.buyAmount === amounts.secondaryAmount ? "pass" : "fail",
+    evidence: inactiveReason
+      ?? (quote?.buyAmount === amounts.secondaryAmount
+        ? `${amounts.secondaryAmount} USDC shortfall has executable calldata`
+        : quote
+          ? `${quote.buyAmount} quoted; ${amounts.secondaryAmount} shortfall required`
+          : (input.split?.swap.quoteError ?? "No shortfall quote")),
+  });
+  constraints.push({
+    id: "quote-fresh",
+    label: "Split quote remains executable",
+    status: inactiveReason || !quote ? "pending" : quote.expiresAt > input.now ? "pass" : "fail",
+    evidence: inactiveReason
+      ?? (quote ? `expires ${quote.expiresAt}; observed ${input.now}` : "Pending shortfall quote"),
+  });
+  constraints.push({
+    id: "balance-sufficient",
+    label: "WMON balance covers the shortfall maximum",
+    status: inactiveReason || !quote
+      ? "pending"
+      : input.swap.balance >= maximumSpend ? "pass" : "fail",
+    evidence: inactiveReason
+      ?? (quote
+        ? `${input.swap.balance} available; ${maximumSpend} maximum`
+        : "Pending shortfall quote"),
+  });
+  const configuredMaximum = input.preferences?.maxWmonSpend;
+  constraints.push({
+    id: "maximum-spend",
+    label: "Shortfall quote respects the WMON spending cap",
+    status: inactiveReason || !quote
+      ? "pending"
+      : configuredMaximum === undefined || maximumSpend <= configuredMaximum ? "pass" : "fail",
+    evidence: inactiveReason
+      ?? (!quote
+        ? "Pending shortfall quote"
+        : configuredMaximum === undefined
+          ? "No additional WMON cap configured"
+          : `${maximumSpend} quoted; ${configuredMaximum} allowed`),
+  });
+  const maximumSwapCost = input.preferences?.maxSwapCostBps;
+  if (maximumSwapCost !== undefined) {
+    constraints.push({
+      id: "swap-cost",
+      label: "Shortfall quote respects the swap-cost cap",
+      status: inactiveReason || !quote
+        ? "pending"
+        : quote.swapCostBps !== undefined && quote.swapCostBps <= maximumSwapCost ? "pass" : "fail",
+      evidence: inactiveReason
+        ?? (!quote
+          ? "Pending shortfall quote"
+          : quote.swapCostBps === undefined
+            ? "Quote does not contain swap-cost evidence"
+            : `${quote.swapCostBps} bps quoted; ${maximumSwapCost} bps allowed`),
+    });
+  }
+  constraints.push(simulationConstraint(input.split?.swap.simulation ?? {
+    status: "not-run",
+    reason: "Split quote has not been requested",
+  }));
+
+  const simulation = input.split?.swap.simulation ?? { status: "not-run" as const };
+  const estimatedGasUnits = (simulation.gasEstimate ?? SPLIT_SWAP_GAS_UNITS)
+    + BigInt(approvalCount) * APPROVAL_GAS_UNITS;
+  const swapCostBps = quote?.swapCostBps ?? 0;
+  return finalizePlan({
+    id: "split-usdc-wmon",
+    kind: "direct-exact-output-swap",
+    fundingAsset: "USDC_WMON",
+    decimals: 18,
+    requiredAmount: input.invoiceAmount,
+    maximumSpend,
+    ...(quote ? {
+      estimatedSpend: quote.estimatedSellAmount,
+      quoteExpiresAt: quote.expiresAt,
+    } : {}),
+    balance: input.swap.balance,
+    allowance: input.swap.allowance,
+    approvalRequired: approvalCount > 0,
+    split: {
+      directAmount: amounts.directAmount,
+      secondaryAmount: amounts.secondaryAmount,
+      directAllowance: input.direct.allowance,
+      secondaryAllowance: input.swap.allowance,
+      directApprovalRequired,
+      secondaryApprovalRequired,
+    },
+    simulation,
+    steps: splitSteps("WMON", directApprovalRequired, secondaryApprovalRequired, constraints),
+    constraints,
+    cost: buildCost(
+      estimatedGasUnits,
+      approvalCount,
+      swapCostBps,
+      preferencePenaltyFor("USDC_WMON", input),
+    ),
+  });
+}
+
+function buildSplitVaultPlan(input: PlannerInput): PaymentPlan {
+  const amounts = calculateSplitAmounts(
+    input.invoiceAmount,
+    input.direct.balance,
+    input.preferences?.minimumUsdcReserve,
+  );
+  const vault = input.vault;
+  const splitVault = input.split?.vault;
+  const maximumSpend = splitVault?.maxShares ?? 0n;
+  const directApprovalRequired = amounts.available
+    && input.direct.allowance < amounts.directAmount;
+  const secondaryApprovalRequired = amounts.available && vault !== undefined
+    && maximumSpend > 0n && vault.allowance < maximumSpend;
+  const approvalCount = Number(directApprovalRequired) + Number(secondaryApprovalRequired);
+  const terminalReason = input.invoiceAlreadyPaid
+    ? "Skipped because the router reports this invoice paid"
+    : input.invoiceExpiry < input.now
+      ? "Skipped because the invoice has expired"
+      : undefined;
+  const inactiveReason = terminalReason ?? (!amounts.available ? amounts.reason : undefined);
+  const constraints = commonConstraints(input);
+  constraints.push(splitRequiredConstraint(amounts));
+  constraints.push({
+    id: "usdc-reserve",
+    label: "Split preserves the configured USDC reserve",
+    status: amounts.available ? "pass" : "pending",
+    evidence: amounts.available
+      ? `${input.direct.balance - amounts.directAmount} remains after ${amounts.directAmount} direct`
+      : (amounts.reason ?? "Split is not required"),
+  });
+  constraints.push({
+    id: "vault-verified",
+    label: "Vault is the router's allowlisted ERC-4626 position",
+    status: inactiveReason ? "pending" : vault?.verified ? "pass" : "fail",
+    evidence: inactiveReason
+      ?? (vault?.verified
+        ? "Configured vault matches the router's immutable vault"
+        : (vault?.readError ?? splitVault?.readError ?? "Configured vault could not be verified")),
+  });
+  constraints.push({
+    id: "vault-asset",
+    label: "Vault underlying asset matches invoice USDC",
+    status: inactiveReason || !vault?.verified
+      ? "pending"
+      : vault.assetMatches ? "pass" : "fail",
+    evidence: inactiveReason
+      ?? (!vault?.verified
+        ? "Pending verified vault"
+        : vault.assetMatches ? "vault.asset() equals settlement token" : "Vault asset mismatch"),
+  });
+  constraints.push({
+    id: "vault-liquidity",
+    label: "Vault maxWithdraw covers the split shortfall",
+    status: inactiveReason || !vault?.verified
+      ? "pending"
+      : vault.maxWithdraw >= amounts.secondaryAmount ? "pass" : "fail",
+    evidence: inactiveReason
+      ?? (!vault?.verified
+        ? "Pending verified vault"
+        : `${vault.maxWithdraw} withdrawable; ${amounts.secondaryAmount} shortfall`),
+  });
+  constraints.push({
+    id: "balance-sufficient",
+    label: "Vault shares cover the protected shortfall maximum",
+    status: inactiveReason || !vault?.verified || maximumSpend === 0n
+      ? "pending"
+      : vault.balance >= maximumSpend ? "pass" : "fail",
+    evidence: inactiveReason
+      ?? (!vault?.verified || maximumSpend === 0n
+        ? (splitVault?.readError ?? "Pending shortfall preview")
+        : `${vault.balance} shares available; ${maximumSpend} maximum`),
+  });
+  constraints.push({
+    id: "maximum-spend",
+    label: "Share cap covers the shortfall preview",
+    status: inactiveReason || !vault?.verified
+      ? "pending"
+      : splitVault?.previewShares === undefined
+        ? "fail"
+        : maximumSpend >= splitVault.previewShares && splitVault.previewShares > 0n ? "pass" : "fail",
+    evidence: inactiveReason
+      ?? (splitVault?.previewShares === undefined
+        ? (splitVault?.readError ?? "Pending shortfall preview")
+        : `${splitVault.previewShares} previewed; ${maximumSpend} maximum`),
+  });
+  constraints.push(simulationConstraint(splitVault?.simulation ?? {
+    status: "not-run",
+    reason: splitVault?.readError ?? "Split vault preview has not run",
+  }));
+
+  const simulation = splitVault?.simulation ?? { status: "not-run" as const };
+  const estimatedGasUnits = (simulation.gasEstimate ?? SPLIT_VAULT_GAS_UNITS)
+    + BigInt(approvalCount) * APPROVAL_GAS_UNITS;
+  return finalizePlan({
+    id: "split-usdc-vault",
+    kind: "direct-erc4626-withdraw",
+    fundingAsset: "USDC_VAULT_USDC",
+    decimals: vault?.shareDecimals ?? 18,
+    requiredAmount: input.invoiceAmount,
+    maximumSpend,
+    ...(splitVault?.previewShares === undefined
+      ? {}
+      : { estimatedSpend: splitVault.previewShares }),
+    balance: vault?.balance ?? 0n,
+    allowance: vault?.allowance ?? 0n,
+    approvalRequired: approvalCount > 0,
+    split: {
+      directAmount: amounts.directAmount,
+      secondaryAmount: amounts.secondaryAmount,
+      directAllowance: input.direct.allowance,
+      secondaryAllowance: vault?.allowance ?? 0n,
+      directApprovalRequired,
+      secondaryApprovalRequired,
+    },
+    simulation,
+    steps: splitSteps(
+      "VAULT_USDC",
+      directApprovalRequired,
+      secondaryApprovalRequired,
+      constraints,
+    ),
+    constraints,
+    cost: buildCost(
+      estimatedGasUnits,
+      approvalCount,
+      0,
+      preferencePenaltyFor("USDC_VAULT_USDC", input),
+    ),
+  });
+}
+
+function splitRequiredConstraint(
+  amounts: ReturnType<typeof calculateSplitAmounts>,
+): ConstraintResult {
+  return {
+    id: "split-required",
+    label: "A nonzero direct contribution and secondary shortfall are both required",
+    status: amounts.available ? "pass" : "fail",
+    evidence: amounts.available
+      ? `${amounts.directAmount} direct; ${amounts.secondaryAmount} secondary`
+      : (amounts.reason ?? "Split is unavailable"),
   };
 }
 
@@ -313,9 +669,15 @@ function buildSwapPlan(input: PlannerInput): PaymentPlan {
   constraints.push({
     id: "quote-available",
     label: "Executable exact-output quote is available",
-    status: terminalReason ? "pending" : quote ? "pass" : "fail",
+    status: terminalReason
+      ? "pending"
+      : quote?.buyAmount === input.invoiceAmount ? "pass" : "fail",
     evidence: terminalReason
-      ?? (quote ? "Pool returned executable calldata" : (input.swap.quoteError ?? "No quote")),
+      ?? (quote?.buyAmount === input.invoiceAmount
+        ? "Pool returned executable calldata for the exact invoice amount"
+        : quote
+          ? `${quote.buyAmount} quoted; ${input.invoiceAmount} required`
+          : (input.swap.quoteError ?? "No quote")),
   });
   constraints.push({
     id: "quote-fresh",
@@ -473,6 +835,34 @@ function approvalAndPaymentSteps(
   ];
 }
 
+function splitSteps(
+  secondaryAsset: "WMON" | "VAULT_USDC",
+  directApprovalRequired: boolean,
+  secondaryApprovalRequired: boolean,
+  constraints: ConstraintResult[],
+): RouteStep[] {
+  const blocked = constraints.some((constraint) => constraint.status === "fail");
+  return [
+    {
+      kind: "approval",
+      label: "Approve direct USDC contribution",
+      status: directApprovalRequired ? "required" : "satisfied",
+    },
+    {
+      kind: "approval",
+      label: secondaryAsset === "VAULT_USDC"
+        ? "Approve vault share maximum"
+        : "Approve WMON maximum",
+      status: secondaryApprovalRequired ? "required" : "satisfied",
+    },
+    {
+      kind: "payment",
+      label: "Atomically settle both funding legs",
+      status: blocked ? "blocked" : "ready",
+    },
+  ];
+}
+
 function finalizePlan(
   plan: Omit<PaymentPlan, "status" | "rejectionReasons">,
 ): PaymentPlan {
@@ -497,17 +887,21 @@ function simulationGas(
 
 function preferencePenaltyFor(asset: FundingAsset, input: PlannerInput): number {
   const preferred = input.preferences?.preferredFundingAsset ?? "USDC";
+  if (asset === "USDC_WMON") return preferred === "USDC" || preferred === "WMON" ? 100 : 1_000;
+  if (asset === "USDC_VAULT_USDC") return preferred === "USDC" ? 100 : 1_000;
   if (asset === "VAULT_USDC") return preferred === "USDC" ? 250 : 1_000;
   return asset === preferred ? 0 : 1_000;
 }
 
 function buildCost(
   estimatedGasUnits: bigint,
-  approvalRequired: boolean,
+  approvals: boolean | number,
   swapCostBps: number,
   preferencePenalty: number,
 ): RouteCost {
-  const approvalTransactions = approvalRequired ? 1 : 0;
+  const approvalTransactions = typeof approvals === "number"
+    ? approvals
+    : approvals ? 1 : 0;
   const gasScore = Number(estimatedGasUnits / 10_000n);
   return {
     estimatedGasUnits,

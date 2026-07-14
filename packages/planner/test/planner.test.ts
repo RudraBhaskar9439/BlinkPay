@@ -18,6 +18,7 @@ function input(overrides: Partial<PlannerInput> = {}): PlannerInput {
       balance: 50_000_000_000_000_000n,
       allowance: 0n,
       quote: {
+        buyAmount: 100_000n,
         estimatedSellAmount: 1_013_140_431_395_196n,
         maxSellAmount: 1_018_206_133_552_172n,
         expiresAt: NOW + 180n,
@@ -118,7 +119,8 @@ describe("deterministic payment planner", () => {
       preferences: { preferredFundingAsset: "WMON" },
     }));
     expect(result.recommendedPlanId).toBe("swap-wmon");
-    expect(result.plans.every((plan) => plan.status === "eligible")).toBe(true);
+    expect(result.plans.filter((plan) => !plan.id.startsWith("split-"))
+      .every((plan) => plan.status === "eligible")).toBe(true);
   });
 
   it("rejects direct payment when it would consume the required USDC reserve", () => {
@@ -202,5 +204,94 @@ describe("deterministic payment planner", () => {
 
     expect(vault?.status).toBe("unavailable");
     expect(vault?.rejectionReasons.join(" ")).toContain("Share cap");
+  });
+
+  it("builds exact direct plus vault shortfall evidence", () => {
+    const base = input();
+    const result = buildPaymentPlans({
+      ...base,
+      direct: {
+        balance: 60_000n,
+        allowance: 0n,
+        simulation: { status: "requires-approval" },
+      },
+      split: {
+        swap: { quoteError: "not requested", simulation: { status: "not-run" } },
+        vault: {
+          previewShares: 40_000n,
+          maxShares: 40_200n,
+          simulation: { status: "requires-approval" },
+        },
+      },
+    });
+    const split = result.plans.find((plan) => plan.id === "split-usdc-vault");
+
+    expect(split?.status).toBe("eligible");
+    expect(split?.split?.directAmount).toBe(60_000n);
+    expect(split?.split?.secondaryAmount).toBe(40_000n);
+    expect(split?.maximumSpend).toBe(40_200n);
+    expect(split?.cost.approvalTransactions).toBe(2);
+  });
+
+  it("subtracts the protected reserve before calculating a split", () => {
+    const base = input();
+    const result = buildPaymentPlans({
+      ...base,
+      direct: {
+        balance: 80_000n,
+        allowance: 80_000n,
+        simulation: { status: "requires-approval" },
+      },
+      preferences: { minimumUsdcReserve: 30_000n },
+      split: {
+        swap: {
+          quote: {
+            buyAmount: 50_000n,
+            estimatedSellAmount: 500n,
+            maxSellAmount: 510n,
+            expiresAt: NOW + 180n,
+            swapCostBps: 25,
+          },
+          simulation: { status: "requires-approval" },
+        },
+        vault: { readError: "not requested", simulation: { status: "not-run" } },
+      },
+    });
+    const split = result.plans.find((plan) => plan.id === "split-usdc-wmon");
+
+    expect(split?.status).toBe("eligible");
+    expect(split?.split?.directAmount).toBe(50_000n);
+    expect(split?.split?.secondaryAmount).toBe(50_000n);
+  });
+
+  it("rejects a split quote that does not equal the deterministic shortfall", () => {
+    const base = input();
+    const result = buildPaymentPlans({
+      ...base,
+      direct: { ...base.direct, balance: 60_000n },
+      split: {
+        swap: {
+          quote: {
+            buyAmount: 39_999n,
+            estimatedSellAmount: 500n,
+            maxSellAmount: 510n,
+            expiresAt: NOW + 180n,
+          },
+          simulation: { status: "requires-approval" },
+        },
+        vault: { readError: "not requested", simulation: { status: "not-run" } },
+      },
+    });
+    const split = result.plans.find((plan) => plan.id === "split-usdc-wmon");
+
+    expect(split?.status).toBe("unavailable");
+    expect(split?.rejectionReasons.join(" ")).toContain("40000 shortfall required");
+  });
+
+  it("does not offer a redundant split when wallet USDC covers the invoice", () => {
+    const result = buildPaymentPlans(input());
+
+    expect(result.plans.filter((plan) => plan.id.startsWith("split-"))
+      .every((plan) => plan.status === "unavailable")).toBe(true);
   });
 });
