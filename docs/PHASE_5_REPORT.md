@@ -2,14 +2,15 @@
 
 ## Outcome
 
-Phase 5A and Phase 5B are complete. BlinkPay can discover one immutable,
+Phase 5A, Phase 5B, and Phase 5C are complete. BlinkPay can discover one immutable,
 allowlisted ERC-4626 position, prove its underlying asset and immediate
 liquidity, rank it beside direct USDC and exact-output WMON, and atomically
 redeem only the USDC required by a merchant-signed invoice.
 
-The contracts and funded payer position are live on Monad testnet. Phase 5C is
-the remaining manual gate: the payer must approve the vault shares in MetaMask
-and sign one `0.1 USDC` vault-funded payment through the checkout.
+The contracts and funded payer position are live on Monad testnet. The payer
+approved the protected share maximum and signed a `0.1 USDC` vault-funded
+payment through the checkout. Independent historical and current-state RPC
+reads confirm every expected balance delta, event, residual, and replay guard.
 
 ## Testnet target decision
 
@@ -134,19 +135,40 @@ without browser console errors. The live quote endpoint also returned a fresh
 WMON alternative for the same `0.1 USDC` invoice, proving the new router did not
 break the existing swap route.
 
-## Remaining manual acceptance
+## Phase 5C manual acceptance
 
-1. In the normal browser with MetaMask, create a fresh `0.1 USDC` invoice after
-   the new router configuration is loaded.
-2. Open its payment link with the payer wallet
-   `0x76D7D56fb21A6969E1F07B722e3c63E2c80a7cB1`.
-3. Select **Analyze wallet routes** and confirm the vault position displays
-   `1.0 USDC`, the vault route is eligible, and its preview/cap are visible.
-4. Select **Pay from vault**, approve only the displayed share maximum, and
-   sign the payment.
-5. Record the receipt and independently verify merchant USDC delta, payer share
-   delta, remaining position, zero router residuals, event fields, and replay
-   rejection.
+The payer completed the vault route on July 15, 2026:
 
-Phase 5 passes its exit gate only after that final wallet-signed receipt is
-recorded.
+- [vault payment receipt](https://testnet.monadscan.com/tx/0x077d01f0badc85864e8d99b964a39c9979e46d47742184d3679a405e52a20f67)
+- block `44,966,664` at `2026-07-14T23:17:00Z`
+- payer `0x76D7D56fb21A6969E1F07B722e3c63E2c80a7cB1`
+- merchant `0xD1A199076f5BA0Da38E190D05D60A19a092061d2`
+- invoice `0x67a3a2d1a7b645f9b39e4c40514fa576eb6b2c6c948df89c883f1954d23bba43`
+- protected maximum `100,500` shares
+- actual redemption `100,000` shares for `100,000` USDC base units
+- transaction status success with `269,682` gas used
+
+Historical reads at blocks `44,966,663` and `44,966,664` prove:
+
+| Fact | Before | After | Delta |
+| --- | ---: | ---: | ---: |
+| Merchant USDC | `300,000` | `400,000` | `+100,000` |
+| Payer wallet USDC | `800,000` | `800,000` | `0` |
+| Payer vault shares | `1,000,000` | `900,000` | `-100,000` |
+| Vault total assets | `1,000,000` | `900,000` | `-100,000` |
+| Router share allowance | `100,500` | `500` | `-100,000` |
+
+Receipt logs show the vault burned exactly `100,000` payer shares, transferred
+exactly `100,000` USDC units to the router, and the router transferred exactly
+those `100,000` units to the merchant. `PaymentSettled` and
+`VaultPaymentSettled` contain the same invoice, payer, merchant/vault, amount,
+maximum, and observed redemption.
+
+Post-payment reads show `900,000` shares worth `900,000` USDC base units and
+`maxWithdraw = 900,000`. The three-route router retains `0 USDC`, `0 WMON`, and
+`0 vault shares`. Its paid mapping is `true`. Replaying the identical calldata
+reverts with `InvoiceAlreadyPaid(invoiceId)` (`0x0bd84c19`).
+
+Phase 5 passes its exit gate: direct, swap, and vault routes are real,
+independently tested, visible in the deterministic planner, and proven through
+wallet-signed Monad testnet receipts.

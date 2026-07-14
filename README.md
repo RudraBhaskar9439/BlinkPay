@@ -51,7 +51,7 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 4C: live wallet preference-switch acceptance matrix
 - [x] Phase 5A: atomic ERC-4626 vault settlement and deterministic constraints
 - [x] Phase 5B: live Monad testnet vault/router deployment and funded payer position
-- [ ] Phase 5C: complete the final payer-signed vault payment acceptance
+- [x] Phase 5C: payer-signed vault payment and independently verified receipt
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
