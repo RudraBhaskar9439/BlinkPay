@@ -133,4 +133,15 @@ contract BlinkPayRouter is EIP712, ReentrancyGuard {
             revert InvalidMerchantSignature();
         }
     }
+
+    /// @dev Transfers settlement assets already held by the router and verifies exact receipt.
+    function _settleMerchantFromRouter(Invoice calldata invoice) internal {
+        uint256 merchantBalanceBefore = settlementAsset.balanceOf(invoice.merchant);
+        settlementAsset.safeTransfer(invoice.merchant, invoice.amount);
+        uint256 merchantBalanceAfter = settlementAsset.balanceOf(invoice.merchant);
+        uint256 received = merchantBalanceAfter >= merchantBalanceBefore
+            ? merchantBalanceAfter - merchantBalanceBefore
+            : 0;
+        if (received != invoice.amount) revert InexactSettlement(invoice.amount, received);
+    }
 }

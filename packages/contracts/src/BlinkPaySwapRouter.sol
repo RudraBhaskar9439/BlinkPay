@@ -85,7 +85,7 @@ contract BlinkPaySwapRouter is BlinkPayRouter {
         paidInvoices[invoice.invoiceId] = true;
         (uint256 actualSellAmount, uint256 refund) =
             _executeSwap(maxSellAmount, invoice.amount, swapCallData);
-        _settleMerchant(invoice);
+        _settleMerchantFromRouter(invoice);
 
         if (refund != 0) sellAsset.safeTransfer(msg.sender, refund);
 
@@ -135,17 +135,5 @@ contract BlinkPaySwapRouter is BlinkPayRouter {
             revert SellBalanceAccountingError(maxSellAmount, refund);
         }
         actualSellAmount = maxSellAmount - refund;
-    }
-
-    function _settleMerchant(Invoice calldata invoice) private {
-        uint256 merchantBalanceBefore = settlementAsset.balanceOf(invoice.merchant);
-        settlementAsset.safeTransfer(invoice.merchant, invoice.amount);
-        uint256 merchantBalanceAfter = settlementAsset.balanceOf(invoice.merchant);
-        uint256 merchantReceived = merchantBalanceAfter >= merchantBalanceBefore
-            ? merchantBalanceAfter - merchantBalanceBefore
-            : 0;
-        if (merchantReceived != invoice.amount) {
-            revert InexactSettlement(invoice.amount, merchantReceived);
-        }
     }
 }
