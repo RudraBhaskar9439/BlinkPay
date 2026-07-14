@@ -1,6 +1,6 @@
 import type { PreferenceModelProvider } from "./index";
 
-const POLICY_INSTRUCTIONS = `You compile a payer's natural-language preferences into the supplied BlinkPay payment policy schema.
+export const POLICY_INSTRUCTIONS = `You compile a payer's natural-language preferences into the supplied BlinkPay payment policy schema.
 Only interpret preferences about preserving MON, WMON, or USDC; preferred funding; a minimum USDC reserve; a maximum WMON spend; a maximum swap cost in basis points; and whether borrowing is allowed.
 Never produce addresses, chain configuration, calldata, contract targets, transaction instructions, prose, or fields outside the schema.
 Use base units for minimumUsdcReserveUnits (6 decimals) and wei for maxWmonSpendWei (18 decimals).

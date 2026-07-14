@@ -4,11 +4,11 @@
 
 Phase 4A and Phase 4B are implemented. Payer language is compiled into a
 versioned payment policy, strictly validated, normalized into planner inputs,
-and displayed as deterministic rules. Server-only xAI and OpenAI adapters can
-compile phrases that are outside the local parser while preserving the same
-validation boundary. If the provider is missing, unavailable, refuses, returns
-incomplete output, or returns malformed output, BlinkPay remains usable through
-a deterministic fallback or the safe default policy.
+and displayed as deterministic rules. Server-only Groq, xAI, and OpenAI
+adapters can compile phrases that are outside the local parser while preserving
+the same validation boundary. If the provider is missing, unavailable, refuses,
+returns incomplete output, or returns malformed output, BlinkPay remains usable
+through a deterministic fallback or the safe default policy.
 
 The final Phase 4C wallet acceptance matrix remains open. It requires the payer
 to analyze the same fresh invoice once with **Preserve MON** and once with
@@ -48,15 +48,26 @@ object is parsed again by BlinkPay's strict validator. Explanations are produced
 from the validated policy by deterministic code; model prose is never rendered
 or used as a score.
 
-The adapters use the Responses API with strict JSON Schema Structured Outputs.
-When `XAI_API_KEY` is present, BlinkPay uses xAI and defaults to `grok-4.3`;
-`XAI_POLICY_MODEL` can override it. xAI takes priority if both provider keys are
-configured. `OPENAI_API_KEY` and `OPENAI_POLICY_MODEL` remain supported as an
-alternative. All keys are server-only. Without a provider key, the API uses the
-deterministic compiler. The implementation follows xAI's official
-[Structured Outputs guide](https://docs.x.ai/developers/model-capabilities/text/structured-outputs),
-[Responses API guide](https://docs.x.ai/developers/model-capabilities/text/generate-text),
-and [Grok 4.3 model documentation](https://docs.x.ai/developers/models/grok-4.3).
+The preferred configured provider is Groq. `LLM_API_KEY` (or `GROQ_API_KEY`),
+`LLM_BASE_URL`, and `LLM_MODEL` configure it. The demo configuration uses
+`https://api.groq.com/openai/v1` and `llama-3.3-70b-versatile`.
+
+That Llama model supports JSON Object Mode, not provider-enforced JSON Schema.
+BlinkPay therefore includes the schema in static compiler instructions, parses
+the returned JSON, and applies the same strict local validator used for every
+provider. The UI labels this path **Groq compiled · JSON validated**, avoiding a
+false claim that Groq enforced the schema. Groq's current model page documents
+the model's [JSON Object Mode capability](https://console.groq.com/docs/model/llama-3.3-70b-versatile),
+and its [OpenAI compatibility guide](https://console.groq.com/docs/openai)
+documents the configured base URL.
+
+Groq has announced that `llama-3.3-70b-versatile` will be shut down for free and
+developer-tier users on August 16, 2026. Its documented replacements are
+`openai/gpt-oss-120b` or `qwen/qwen3.6-27b`. BlinkPay keeps the model in an
+environment variable so migration requires no code change. xAI and OpenAI
+Responses API adapters remain supported behind their provider-specific keys.
+All keys are server-only. Without a provider key, the API uses the deterministic
+compiler.
 
 ## Planner effects
 
@@ -78,9 +89,10 @@ evidence, gas estimates, replay state, calldata, or contract addresses.
 The policy suite covers representative preservation phrases, reserve/spend/cost
 normalization, contradictions, unsupported assets, bounds, executable
 configuration attempts, additional model fields, malformed model output,
-provider failure, strict Responses API request construction, refusal,
-incomplete output, invalid JSON, sanitized upstream HTTP errors, and provider-
-specific endpoint/configuration behavior.
+provider failure, strict Responses API request construction, Groq JSON Object
+Mode construction, refusal, incomplete output, invalid JSON, unsafe base URLs,
+sanitized upstream HTTP errors, and provider-specific endpoint/configuration
+behavior.
 
 The planner suite additionally proves that a USDC reserve can reject the direct
 route and that a swap-cost cap can reject the WMON route. Existing deterministic
@@ -98,8 +110,8 @@ server-only `/api/preferences` endpoint.
 
 ## Phase 4C manual acceptance
 
-1. Add the xAI key locally as `XAI_API_KEY` if the live AI badge is part of the
-   test. Never paste or commit the key.
+1. Add the Groq key locally as `LLM_API_KEY` or `GROQ_API_KEY`. Keep the supplied
+   `LLM_BASE_URL` and `LLM_MODEL` values. Never paste or commit the key.
 2. Create one fresh `0.1 USDC` invoice and open it with the payer wallet.
 3. Choose **Preserve MON**, compile the policy, and analyze wallet routes.
 4. Record balances, maximums, gas, swap cost, eligibility, scores, and rank.

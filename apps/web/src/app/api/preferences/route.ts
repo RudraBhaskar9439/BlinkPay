@@ -3,6 +3,11 @@ import {
   compilePreferenceWithModel,
 } from "@blinkpay/policy";
 import {
+  DEFAULT_GROQ_BASE_URL,
+  DEFAULT_GROQ_POLICY_MODEL,
+  createGroqPreferenceProvider,
+} from "@blinkpay/policy/groq";
+import {
   DEFAULT_OPENAI_POLICY_MODEL,
   createOpenAiPreferenceProvider,
 } from "@blinkpay/policy/openai";
@@ -30,26 +35,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "preferenceText must be a string" }, { status: 400 });
   }
 
+  const groqApiKey = process.env.LLM_API_KEY?.trim() || process.env.GROQ_API_KEY?.trim();
   const xaiApiKey = process.env.XAI_API_KEY?.trim();
   const openAiApiKey = process.env.OPENAI_API_KEY?.trim();
-  const provider = xaiApiKey ? "xai" : openAiApiKey ? "openai" : undefined;
-  const result = xaiApiKey
+  const provider = groqApiKey
+    ? "groq"
+    : xaiApiKey ? "xai" : openAiApiKey ? "openai" : undefined;
+  const result = groqApiKey
     ? await compilePreferenceWithModel(
+      body.preferenceText,
+      createGroqPreferenceProvider({
+        apiKey: groqApiKey,
+        baseUrl: process.env.LLM_BASE_URL?.trim() || DEFAULT_GROQ_BASE_URL,
+        model: process.env.LLM_MODEL?.trim() || DEFAULT_GROQ_POLICY_MODEL,
+      }),
+    )
+    : xaiApiKey
+      ? await compilePreferenceWithModel(
       body.preferenceText,
       createXaiPreferenceProvider({
         apiKey: xaiApiKey,
         model: process.env.XAI_POLICY_MODEL?.trim() || DEFAULT_XAI_POLICY_MODEL,
       }),
-    )
-    : openAiApiKey
-      ? await compilePreferenceWithModel(
-        body.preferenceText,
-        createOpenAiPreferenceProvider({
-          apiKey: openAiApiKey,
-          model: process.env.OPENAI_POLICY_MODEL?.trim() || DEFAULT_OPENAI_POLICY_MODEL,
-        }),
       )
-      : compilePreferenceText(body.preferenceText);
+      : openAiApiKey
+        ? await compilePreferenceWithModel(
+          body.preferenceText,
+          createOpenAiPreferenceProvider({
+            apiKey: openAiApiKey,
+            model: process.env.OPENAI_POLICY_MODEL?.trim() || DEFAULT_OPENAI_POLICY_MODEL,
+          }),
+        )
+        : compilePreferenceText(body.preferenceText);
   if (result.status === "clarification") {
     return NextResponse.json(result, { status: 422 });
   }

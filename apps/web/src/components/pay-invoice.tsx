@@ -67,7 +67,7 @@ type RouteAnalysis = PlannerResult & { portfolio: PortfolioSnapshot };
 
 type ActivePolicy = {
   source: Extract<PreferenceCompilation, { status: "compiled" }>["source"];
-  provider?: "xai" | "openai";
+  provider?: "groq" | "xai" | "openai";
   policy: PaymentPolicyV1;
   normalized: NormalizedPaymentPolicy;
   explanations: PolicyExplanation[];
@@ -927,7 +927,7 @@ function requirePolicySource(
 }
 
 function requirePolicyProvider(value: unknown): NonNullable<ActivePolicy["provider"]> {
-  if (value !== "xai" && value !== "openai") {
+  if (value !== "groq" && value !== "xai" && value !== "openai") {
     throw new Error("Preference service returned an invalid provider");
   }
   return value;
@@ -937,8 +937,14 @@ function formatPolicySource(
   source: ActivePolicy["source"],
   provider: ActivePolicy["provider"],
 ): string {
-  const providerLabel = provider === "xai" ? "Grok (xAI)" : provider === "openai" ? "OpenAI" : "AI";
-  if (source === "model") return `${providerLabel} compiled · schema verified`;
+  const providerLabel = provider === "groq"
+    ? "Groq"
+    : provider === "xai" ? "Grok (xAI)" : provider === "openai" ? "OpenAI" : "AI";
+  if (source === "model") {
+    return provider === "groq"
+      ? "Groq compiled · JSON validated"
+      : `${providerLabel} compiled · schema verified`;
+  }
   if (source === "deterministic-fallback") {
     return `${providerLabel} offline · deterministic fallback`;
   }
