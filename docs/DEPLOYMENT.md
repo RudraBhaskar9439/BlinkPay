@@ -1,5 +1,10 @@
 # BlinkPay router deployment
 
+> The hackathon build now runs on Monad testnet. Follow
+> `docs/TESTNET_LIVE_GATE.md` for the active deployment, liquidity, and
+> wallet-to-wallet acceptance flow. The mainnet procedure below is retained for
+> a later production deployment.
+
 This procedure deploys the direct-settlement router. Use a dedicated deployer
 wallet with only the MON required for deployment.
 

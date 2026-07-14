@@ -1,16 +1,26 @@
 import {
+  activeMonadChain,
+  activeMonadNetwork,
+  activeUsdcAddress,
+  activeWmonAddress,
+  createMonadPublicClient,
   monadMainnet,
-  usdcAddresses,
   wmonAddresses,
   zeroExAllowanceHolderAddresses,
 } from "@blinkpay/chain";
-import { decodeSignedInvoice } from "@blinkpay/core";
+import {
+  blinkPayRouterAbi,
+  blinkPayTestnetPoolAbi,
+  decodeSignedInvoice,
+} from "@blinkpay/core";
 import { requestExactBuyQuote } from "@blinkpay/zerox";
 import { NextResponse } from "next/server";
 import {
+  encodeFunctionData,
   getAddress,
   isAddress,
   isHex,
+  toFunctionSelector,
   type Address,
   type Hex,
 } from "viem";
@@ -31,15 +41,19 @@ export async function POST(request: Request) {
       "NEXT_PUBLIC_BLINKPAY_ROUTER_ADDRESS",
     );
 
-    if (invoice.chainId !== BigInt(monadMainnet.id)) {
-      throw new RequestError("Invoice is not for Monad mainnet");
+    if (invoice.chainId !== BigInt(activeMonadChain.id)) {
+      throw new RequestError(`Invoice is not for ${activeMonadChain.name}`);
     }
-    if (invoice.settlementToken !== getAddress(usdcAddresses.mainnet)) {
+    if (invoice.settlementToken !== getAddress(activeUsdcAddress)) {
       throw new RequestError("Invoice settlement token is not canonical Monad USDC");
     }
 
     const now = BigInt(Math.floor(Date.now() / 1_000));
     if (invoice.expiry <= now + 5n) throw new RequestError("Invoice expires too soon to quote safely");
+
+    if (activeMonadNetwork === "testnet") {
+      return NextResponse.json(await createTestnetQuote(invoice.amount, invoice.expiry, router));
+    }
 
     const apiKey = process.env.ZEROX_API_KEY?.trim();
     if (!apiKey) throw new ConfigurationError("0x API key is not configured");
@@ -92,6 +106,98 @@ export async function POST(request: Request) {
         : 502;
     return NextResponse.json({ error: getErrorMessage(error) }, { status });
   }
+}
+
+async function createTestnetQuote(
+  buyAmount: bigint,
+  invoiceExpiry: bigint,
+  router: Address,
+) {
+  const pool = requireAddress(
+    process.env.NEXT_PUBLIC_BLINKPAY_TESTNET_POOL_ADDRESS,
+    "NEXT_PUBLIC_BLINKPAY_TESTNET_POOL_ADDRESS",
+  );
+  const client = createMonadPublicClient("testnet");
+
+  const swapSelector = toFunctionSelector(
+    "swapExactOutput(uint256 maxSellAmount,uint256 amountOut,address recipient)",
+  );
+  const [
+    quotedSellAmount,
+    poolSellAsset,
+    poolSettlementAsset,
+    routerSellAsset,
+    routerSettlementAsset,
+    routerSwapTarget,
+    routerAllowanceTarget,
+    selectorAllowed,
+  ] = await Promise.all([
+    client.readContract({
+      address: pool,
+      abi: blinkPayTestnetPoolAbi,
+      functionName: "quoteExactOutput",
+      args: [buyAmount],
+    }),
+    client.readContract({ address: pool, abi: blinkPayTestnetPoolAbi, functionName: "sellAsset" }),
+    client.readContract({
+      address: pool,
+      abi: blinkPayTestnetPoolAbi,
+      functionName: "settlementAsset",
+    }),
+    client.readContract({ address: router, abi: blinkPayRouterAbi, functionName: "sellAsset" }),
+    client.readContract({
+      address: router,
+      abi: blinkPayRouterAbi,
+      functionName: "settlementAsset",
+    }),
+    client.readContract({ address: router, abi: blinkPayRouterAbi, functionName: "swapTarget" }),
+    client.readContract({ address: router, abi: blinkPayRouterAbi, functionName: "allowanceTarget" }),
+    client.readContract({
+      address: router,
+      abi: blinkPayRouterAbi,
+      functionName: "allowedSwapSelectors",
+      args: [swapSelector],
+    }),
+  ]);
+
+  const canonicalWmon = getAddress(activeWmonAddress);
+  const canonicalUsdc = getAddress(activeUsdcAddress);
+  if (getAddress(poolSellAsset) !== canonicalWmon || getAddress(routerSellAsset) !== canonicalWmon) {
+    throw new ConfigurationError("Testnet pool or router is not configured for canonical WMON");
+  }
+  if (
+    getAddress(poolSettlementAsset) !== canonicalUsdc
+      || getAddress(routerSettlementAsset) !== canonicalUsdc
+  ) {
+    throw new ConfigurationError("Testnet pool or router is not configured for Circle USDC");
+  }
+  if (getAddress(routerSwapTarget) !== pool || getAddress(routerAllowanceTarget) !== pool) {
+    throw new ConfigurationError("Testnet router is not paired with the configured pool");
+  }
+  if (!selectorAllowed) throw new ConfigurationError("Testnet pool swap selector is not allowlisted");
+
+  const maxSellAmount = quotedSellAmount * 10_050n / 10_000n + 1n;
+  const now = BigInt(Math.floor(Date.now() / 1_000));
+  const quoteExpiry = now + 30n;
+  const expiresAt = quoteExpiry < invoiceExpiry ? quoteExpiry : invoiceExpiry;
+  const swapCallData = encodeFunctionData({
+    abi: blinkPayTestnetPoolAbi,
+    functionName: "swapExactOutput",
+    args: [maxSellAmount, buyAmount, router],
+  });
+
+  return {
+    route: "blinkpay-testnet-pool",
+    sellToken: canonicalWmon,
+    buyToken: canonicalUsdc,
+    buyAmount: buyAmount.toString(),
+    maxSellAmount: maxSellAmount.toString(),
+    estimatedSellAmount: quotedSellAmount.toString(),
+    allowanceTarget: pool,
+    swapTarget: pool,
+    swapCallData,
+    expiresAt: expiresAt.toString(),
+  };
 }
 
 async function readBody(request: Request): Promise<QuoteRequestBody> {

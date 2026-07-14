@@ -29,7 +29,9 @@ path.
    allowlisted.
 6. Mainnet transactions use small amounts until the contracts have been
    reviewed and tested on a fork.
-7. Each completed phase ends with a tagged checkpoint or clearly named commit.
+7. The hackathon build runs on Monad testnet by default. Its testnet-only pool
+   is labelled as such and is never represented as 0x or production liquidity.
+8. Each completed phase ends with a tagged checkpoint or clearly named commit.
 
 ## 3. Planned repository layout
 

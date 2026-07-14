@@ -6,7 +6,7 @@ import {
   encodeSignedInvoice,
   type Invoice,
 } from "@blinkpay/core";
-import { usdcAddresses } from "@blinkpay/chain";
+import { activeMonadChain, activeUsdcAddress } from "@blinkpay/chain";
 import { connectInjectedWallet, formatAddress, getConfiguredRouterAddress, getErrorMessage } from "@/lib/wallet";
 import Image from "next/image";
 import QRCode from "qrcode";
@@ -63,11 +63,11 @@ export function MerchantInvoiceForm() {
       const invoice: Invoice = {
         invoiceId: randomId,
         merchant: wallet.account,
-        settlementToken: usdcAddresses.mainnet,
+        settlementToken: activeUsdcAddress,
         amount: amountInUnits,
         expiry: BigInt(Math.floor(timestamp / 1_000) + minutes * 60),
         nonce: BigInt(timestamp),
-        chainId: 143n,
+        chainId: BigInt(activeMonadChain.id),
         metadataHash: createInvoiceMetadataHash(description.trim()),
       };
 
@@ -110,7 +110,7 @@ export function MerchantInvoiceForm() {
   return (
     <section className="checkoutShell" aria-labelledby="invoice-title">
       <div className="checkoutIntro">
-        <p className="sectionNumber">Phase 1 / Direct settlement</p>
+        <p className="sectionNumber">Monad testnet / Signed invoice</p>
         <h1 id="invoice-title" className="checkoutTitle">Request an exact USDC payment.</h1>
         <p className="lede">
           Your wallet signs the invoice offchain. The payer receives the amount,

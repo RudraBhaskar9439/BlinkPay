@@ -1,9 +1,10 @@
 "use client";
 
 import {
+  activeMonadChain,
+  activeMonadNetwork,
+  activeWmonAddress,
   createMonadPublicClient,
-  monadMainnet,
-  wmonAddresses,
 } from "@blinkpay/chain";
 import {
   blinkPayRouterAbi,
@@ -98,7 +99,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
 
     try {
       const routerAddress = getConfiguredRouterAddress();
-      if (invoice.chainId !== BigInt(monadMainnet.id)) throw new Error("Invoice is for a different chain");
+      if (invoice.chainId !== BigInt(activeMonadChain.id)) throw new Error("Invoice is for a different chain");
 
       const signatureValid = await verifyTypedData({
         address: invoice.merchant,
@@ -108,7 +109,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
       if (!signatureValid) throw new Error("Merchant signature is invalid for this router");
 
       const wallet = await connectInjectedWallet();
-      const client = createMonadPublicClient("mainnet");
+      const client = createMonadPublicClient(activeMonadNetwork);
       setAccount(wallet.account);
       setMessage("Checking balance, replay status, and allowance…");
 
@@ -144,7 +145,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
           functionName: "approve",
           args: [routerAddress, invoice.amount],
           account: wallet.account,
-          chain: monadMainnet,
+          chain: activeMonadChain,
         });
         await client.waitForTransactionReceipt({ hash: approvalHash });
       }
@@ -156,7 +157,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
         functionName: "payDirect",
         args: [invoice, signature],
         account: wallet.account,
-        chain: monadMainnet,
+        chain: activeMonadChain,
       });
       const receipt = await client.waitForTransactionReceipt({ hash: paymentHash });
       if (receipt.status !== "success") throw new Error("Payment transaction reverted");
@@ -177,7 +178,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
 
     try {
       const routerAddress = getConfiguredRouterAddress();
-      if (invoice.chainId !== BigInt(monadMainnet.id)) {
+      if (invoice.chainId !== BigInt(activeMonadChain.id)) {
         throw new Error("Invoice is for a different chain");
       }
 
@@ -190,7 +191,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
 
       const wallet = await connectInjectedWallet();
       setAccount(wallet.account);
-      setMessage("Requesting a server-validated exact-output WMON quote…");
+      setMessage("Reading a server-validated exact-output quote from the testnet pool…");
 
       const response = await fetch("/api/quote", {
         method: "POST",
@@ -201,7 +202,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
       if (!response.ok) throw new Error(readQuoteError(value));
 
       const quote = parseSwapQuote(value);
-      if (quote.sellToken !== getAddress(wmonAddresses.mainnet)) {
+      if (quote.sellToken !== getAddress(activeWmonAddress)) {
         throw new Error("Quote sell token is not canonical WMON");
       }
       if (quote.buyAmount !== invoice.amount) throw new Error("Quote changed the invoice amount");
@@ -241,7 +242,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
       if (!signatureValid) throw new Error("Merchant signature is invalid for this router");
 
       const wallet = await connectInjectedWallet();
-      const client = createMonadPublicClient("mainnet");
+      const client = createMonadPublicClient(activeMonadNetwork);
       setAccount(wallet.account);
       setMessage("Checking WMON balance, replay status, and router allowance…");
 
@@ -280,7 +281,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
           functionName: "approve",
           args: [routerAddress, swapQuote.maxSellAmount],
           account: wallet.account,
-          chain: monadMainnet,
+          chain: activeMonadChain,
         });
         await client.waitForTransactionReceipt({ hash: approvalHash });
       }
@@ -304,7 +305,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
           swapQuote.swapCallData,
         ],
         account: wallet.account,
-        chain: monadMainnet,
+        chain: activeMonadChain,
       });
       const receipt = await client.waitForTransactionReceipt({ hash: paymentHash });
       if (receipt.status !== "success") throw new Error("Swap payment transaction reverted");
@@ -337,7 +338,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
           <div><dt>For</dt><dd>{description}</dd></div>
           <div><dt>Merchant</dt><dd><code>{formatAddress(invoice.merchant)}</code></dd></div>
           <div><dt>Expires</dt><dd>{expiry}</dd></div>
-          <div><dt>Network</dt><dd>Monad mainnet</dd></div>
+          <div><dt>Network</dt><dd>{activeMonadChain.name}</dd></div>
           <div><dt>Invoice</dt><dd><code>{invoice.invoiceId.slice(0, 12)}…</code></dd></div>
         </dl>
 
@@ -368,7 +369,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
           <article className="routeCard featuredRoute">
             <p className="cardLabel">Route 02 · Exact buy</p>
             <h2>Pay from WMON</h2>
-            <p>The merchant still gets exactly {displayAmount} USDC. Unspent WMON returns atomically.</p>
+            <p>The testnet pool delivers exactly {displayAmount} USDC. Unspent WMON returns atomically.</p>
             {swapQuote ? (
               <div className="quoteFacts">
                 <span>Maximum spend</span>
@@ -395,7 +396,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
         {transactionHash ? (
           <a
             className="receiptLink"
-            href={`${monadMainnet.blockExplorers.default.url}/tx/${transactionHash}`}
+            href={`${activeMonadChain.blockExplorers.default.url}/tx/${transactionHash}`}
             target="_blank"
             rel="noreferrer"
           >

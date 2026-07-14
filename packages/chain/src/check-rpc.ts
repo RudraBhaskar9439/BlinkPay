@@ -1,15 +1,15 @@
-import { createMonadPublicClient, monadMainnet } from "./index";
+import { activeMonadChain, activeMonadNetwork, createMonadPublicClient } from "./index";
 
 const startedAt = performance.now();
-const client = createMonadPublicClient("mainnet");
+const client = createMonadPublicClient(activeMonadNetwork);
 const [chainId, blockNumber] = await Promise.all([
   client.getChainId(),
   client.getBlockNumber(),
 ]);
 
-if (chainId !== monadMainnet.id) {
-  throw new Error(`Expected chain ${monadMainnet.id}, received ${chainId}`);
+if (chainId !== activeMonadChain.id) {
+  throw new Error(`Expected chain ${activeMonadChain.id}, received ${chainId}`);
 }
 
 const latencyMs = Math.round(performance.now() - startedAt);
-console.log(`Monad mainnet OK — chain ${chainId}, block ${blockNumber}, ${latencyMs} ms`);
+console.log(`${activeMonadChain.name} OK — chain ${chainId}, block ${blockNumber}, ${latencyMs} ms`);

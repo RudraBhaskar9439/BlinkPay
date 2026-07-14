@@ -39,9 +39,10 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 0A: repository and implementation plan
 - [x] Phase 0B: application and contract toolchains
 - [x] Phase 1A: signed invoice and direct USDC implementation
-- [ ] Phase 1B: live Monad deployment and two-wallet smoke test
+- [ ] Phase 1B: live Monad testnet deployment and two-wallet smoke test
 - [x] Phase 2A: exact-output WMON-to-USDC implementation
-- [ ] Phase 2B: current 0x allowlist, fork test, and live WMON payment
+- [x] Phase 2B: testnet pool and exact-output router integration
+- [ ] Phase 2C: fund testnet liquidity and complete a live WMON payment
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
@@ -56,7 +57,7 @@ Prerequisites:
 - Foundry 1.7.1
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 pnpm install --frozen-lockfile
 pnpm check
 pnpm rpc:check
@@ -64,7 +65,7 @@ pnpm dev
 ```
 
 Open `http://localhost:3000`. The foundation screen reads the current Monad
-mainnet block through the server, so an offline or incorrect RPC is visible
+testnet block through the server, so an offline or incorrect RPC is visible
 instead of being presented as a successful connection.
 
 ## Workspace
@@ -82,8 +83,9 @@ Phase 1 implementation evidence is recorded in
 [docs/PHASE_1_REPORT.md](docs/PHASE_1_REPORT.md). The remaining deployment gate
 is described in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-Phase 2 implementation evidence and its still-open live gate are recorded in
-[docs/PHASE_2_REPORT.md](docs/PHASE_2_REPORT.md).
+The current deployment, funding, and two-wallet acceptance gate is in
+[docs/TESTNET_LIVE_GATE.md](docs/TESTNET_LIVE_GATE.md). The 0x mainnet adapter
+remains documented in [docs/PHASE_2_REPORT.md](docs/PHASE_2_REPORT.md).
 
 ## Network
 
@@ -93,6 +95,8 @@ Phase 2 implementation evidence and its still-open live gate are recorded in
   `0x754704Bc059F8C67012fEd69BC8A327a5aafb603`
 - Native Monad testnet USDC:
   `0x534b2f3A21130d7a60830c2Df862319e593943A3`
+- Monad testnet WMON:
+  `0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541`
 
 Contract and integration addresses will be kept in version-controlled chain
 configuration and independently verified before use.
@@ -105,7 +109,7 @@ configuration and independently verified before use.
 - User-defined maximum spend, slippage, and deadlines.
 - AI produces structured preferences, never transaction targets or calldata.
 - Real RPC data and real simulations; no hardcoded success states.
-- Mainnet testing uses deliberately tiny values.
+- Testnet-only liquidity is clearly labelled and never represented as 0x.
 
 ## License
 

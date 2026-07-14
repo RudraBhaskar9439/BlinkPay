@@ -1,4 +1,4 @@
-import { monadMainnet } from "@blinkpay/chain";
+import { activeMonadChain } from "@blinkpay/chain";
 import {
   createWalletClient,
   custom,
@@ -14,6 +14,14 @@ export function getConfiguredRouterAddress(): Address {
   const value = process.env.NEXT_PUBLIC_BLINKPAY_ROUTER_ADDRESS;
   if (!value || !isAddress(value, { strict: true })) {
     throw new Error("BlinkPay router is not configured for this deployment");
+  }
+  return getAddress(value);
+}
+
+export function getConfiguredTestnetPoolAddress(): Address {
+  const value = process.env.NEXT_PUBLIC_BLINKPAY_TESTNET_POOL_ADDRESS;
+  if (!value || !isAddress(value, { strict: true })) {
+    throw new Error("BlinkPay testnet pool is not configured for this deployment");
   }
   return getAddress(value);
 }
@@ -34,7 +42,7 @@ export async function connectInjectedWallet() {
   const account = getAddress(accounts[0]);
   const walletClient = createWalletClient({
     account,
-    chain: monadMainnet,
+    chain: activeMonadChain,
     transport: custom(provider),
   });
 
@@ -52,7 +60,7 @@ async function ensureMonad(provider: EIP1193Provider): Promise<void> {
   try {
     await provider.request({
       method: "wallet_switchEthereumChain",
-      params: [{ chainId: `0x${monadMainnet.id.toString(16)}` }],
+      params: [{ chainId: `0x${activeMonadChain.id.toString(16)}` }],
     });
   } catch (error) {
     if (!isProviderError(error) || error.code !== 4902) throw error;
@@ -61,11 +69,11 @@ async function ensureMonad(provider: EIP1193Provider): Promise<void> {
       method: "wallet_addEthereumChain",
       params: [
         {
-          chainId: `0x${monadMainnet.id.toString(16)}`,
-          chainName: monadMainnet.name,
-          nativeCurrency: monadMainnet.nativeCurrency,
-          rpcUrls: monadMainnet.rpcUrls.default.http,
-          blockExplorerUrls: [monadMainnet.blockExplorers.default.url],
+          chainId: `0x${activeMonadChain.id.toString(16)}`,
+          chainName: activeMonadChain.name,
+          nativeCurrency: activeMonadChain.nativeCurrency,
+          rpcUrls: activeMonadChain.rpcUrls.default.http,
+          blockExplorerUrls: [activeMonadChain.blockExplorers.default.url],
         },
       ],
     });

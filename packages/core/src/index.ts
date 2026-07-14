@@ -18,7 +18,15 @@ export const blinkPayRouterAbi = parseAbi([
   "function sellAsset() view returns (address)",
   "function swapTarget() view returns (address)",
   "function allowanceTarget() view returns (address)",
+  "function allowedSwapSelectors(bytes4 selector) view returns (bool)",
   "event PaymentSettled(bytes32 indexed invoiceId, address indexed payer, address indexed merchant, address settlementToken, uint256 settlementAmount, uint256 merchantNonce)",
+]);
+
+export const blinkPayTestnetPoolAbi = parseAbi([
+  "function sellAsset() view returns (address)",
+  "function settlementAsset() view returns (address)",
+  "function quoteExactOutput(uint256 amountOut) view returns (uint256 amountIn)",
+  "function swapExactOutput(uint256 maxSellAmount, uint256 amountOut, address recipient) returns (uint256 amountIn)",
 ]);
 
 export const BLINKPAY_DOMAIN_NAME = "BlinkPay";

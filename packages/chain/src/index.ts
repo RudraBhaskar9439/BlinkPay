@@ -35,7 +35,7 @@ export const usdcAddresses = {
 
 export const wmonAddresses = {
   mainnet: "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
-  testnet: "0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701",
+  testnet: "0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541",
 } as const satisfies Record<MonadNetwork, Address>;
 
 export const zeroExAllowanceHolderAddresses = {
@@ -43,6 +43,15 @@ export const zeroExAllowanceHolderAddresses = {
 } as const;
 
 export type MonadNetwork = "mainnet" | "testnet";
+
+export function getActiveMonadNetwork(): MonadNetwork {
+  return process.env.NEXT_PUBLIC_MONAD_NETWORK === "mainnet" ? "mainnet" : "testnet";
+}
+
+export const activeMonadNetwork = getActiveMonadNetwork();
+export const activeMonadChain = activeMonadNetwork === "mainnet" ? monadMainnet : monadTestnet;
+export const activeUsdcAddress = usdcAddresses[activeMonadNetwork];
+export const activeWmonAddress = wmonAddresses[activeMonadNetwork];
 
 export function getMonadRpcUrl(network: MonadNetwork): string {
   if (network === "mainnet") {

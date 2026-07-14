@@ -1,17 +1,21 @@
-import { createMonadPublicClient, monadMainnet } from "@blinkpay/chain";
+import {
+  activeMonadChain,
+  activeMonadNetwork,
+  createMonadPublicClient,
+} from "@blinkpay/chain";
 import Link from "next/link";
 
 async function readNetworkStatus(): Promise<
   { ok: true; blockNumber: bigint } | { ok: false }
 > {
   try {
-    const client = createMonadPublicClient("mainnet");
+    const client = createMonadPublicClient(activeMonadNetwork);
     const [chainId, blockNumber] = await Promise.all([
       client.getChainId(),
       client.getBlockNumber(),
     ]);
 
-    if (chainId !== monadMainnet.id) {
+    if (chainId !== activeMonadChain.id) {
       throw new Error(`Unexpected chain ${chainId}`);
     }
 
@@ -36,7 +40,7 @@ export async function NetworkStatus() {
   return (
     <div className="networkStatus online" role="status">
       <span className="statusDot" />
-      Monad block {Number(status.blockNumber).toLocaleString("en-US")}
+      {activeMonadChain.name} block {Number(status.blockNumber).toLocaleString("en-US")}
     </div>
   );
 }
