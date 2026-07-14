@@ -21,6 +21,16 @@ import {
   type SimulationResult,
 } from "@blinkpay/planner";
 import {
+  DEFAULT_PAYMENT_POLICY_V1,
+  explainPaymentPolicy,
+  normalizePaymentPolicy,
+  parsePaymentPolicyV1,
+  type NormalizedPaymentPolicy,
+  type PaymentPolicyV1,
+  type PolicyExplanation,
+  type PreferenceCompilation,
+} from "@blinkpay/policy";
+import {
   connectInjectedWallet,
   formatAddress,
   getConfiguredRouterAddress,
@@ -55,6 +65,14 @@ type SwapQuote = {
 
 type RouteAnalysis = PlannerResult & { portfolio: PortfolioSnapshot };
 
+type ActivePolicy = {
+  source: Extract<PreferenceCompilation, { status: "compiled" }>["source"];
+  policy: PaymentPolicyV1;
+  normalized: NormalizedPaymentPolicy;
+  explanations: PolicyExplanation[];
+  warning?: string;
+};
+
 function parsePayload(payload: string | undefined): ParsedPayload {
   if (!payload) return { ok: false, error: "This payment link does not contain an invoice." };
   try {
@@ -70,6 +88,15 @@ export function PayInvoice({ payload }: { payload?: string }) {
   const [transactionHash, setTransactionHash] = useState<Hex>();
   const [swapQuote, setSwapQuote] = useState<SwapQuote>();
   const [routeAnalysis, setRouteAnalysis] = useState<RouteAnalysis>();
+  const [preferenceText, setPreferenceText] = useState("");
+  const [activePolicy, setActivePolicy] = useState<ActivePolicy>(() => ({
+    source: "deterministic",
+    policy: DEFAULT_PAYMENT_POLICY_V1,
+    normalized: normalizePaymentPolicy(DEFAULT_PAYMENT_POLICY_V1),
+    explanations: explainPaymentPolicy(DEFAULT_PAYMENT_POLICY_V1),
+  }));
+  const [policyBusy, setPolicyBusy] = useState(false);
+  const [policyMessage, setPolicyMessage] = useState("Safe default: no borrowing and no hidden preferences.");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Review every field before connecting your wallet.");
 
@@ -117,6 +144,29 @@ export function PayInvoice({ payload }: { payload?: string }) {
       setMessage(getErrorMessage(error));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function compilePreferences() {
+    setPolicyBusy(true);
+    try {
+      const response = await fetch("/api/preferences", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ preferenceText }),
+      });
+      const value: unknown = await response.json();
+      if (!response.ok) throw new Error(readPreferenceError(value));
+      const nextPolicy = parsePreferenceResponse(value);
+      setActivePolicy(nextPolicy);
+      setRouteAnalysis(undefined);
+      setTransactionHash(undefined);
+      setPolicyMessage(nextPolicy.warning
+        ?? "Policy compiled. Analyze again to apply it to unchanged live route facts.");
+    } catch (error) {
+      setPolicyMessage(getErrorMessage(error));
+    } finally {
+      setPolicyBusy(false);
     }
   }
 
@@ -243,6 +293,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
           } : { quoteError: quoteError ?? "Unable to obtain a quote" }),
           simulation: swapSimulation,
         },
+        preferences: plannerPreferences(activePolicy.normalized),
       });
 
       setSwapQuote(quote);
@@ -533,6 +584,57 @@ export function PayInvoice({ payload }: { payload?: string }) {
           ) : <code>{formatAddress(account)}</code>}
         </div>
 
+        <section className="policyCompiler" aria-labelledby="policy-compiler-title">
+          <div className="policyCompilerHeader">
+            <div>
+              <p className="cardLabel">Phase 4 · AI preference compiler</p>
+              <h2 id="policy-compiler-title">Describe how your money should move.</h2>
+            </div>
+            <span className="policySource">{formatPolicySource(activePolicy.source)}</span>
+          </div>
+
+          <label className="policyInput">
+            <span>Payment preferences</span>
+            <textarea
+              value={preferenceText}
+              onChange={(event) => setPreferenceText(event.target.value)}
+              placeholder="Preserve MON, never borrow, and keep at least 5 USDC."
+              maxLength={500}
+            />
+          </label>
+
+          <div className="policyExamples" aria-label="Preference examples">
+            <button type="button" onClick={() => setPreferenceText("Preserve MON and never borrow")}>Preserve MON</button>
+            <button type="button" onClick={() => setPreferenceText("Preserve USDC and never borrow")}>Preserve USDC</button>
+            <button type="button" onClick={() => setPreferenceText("Cost under 200 bps and never borrow")}>Cap swap cost</button>
+          </div>
+
+          <div className="policyActions">
+            <button
+              className="secondaryButton"
+              type="button"
+              onClick={compilePreferences}
+              disabled={policyBusy || busy}
+            >
+              {policyBusy ? "Compiling…" : "Compile strict policy"}
+            </button>
+            <p role="status">{policyMessage}</p>
+          </div>
+
+          <div className="policyRules" aria-label="Active policy rules">
+            {activePolicy.explanations.map((explanation) => (
+              <article key={explanation.id}>
+                <strong>{explanation.label}</strong>
+                <span>{explanation.effect}</span>
+              </article>
+            ))}
+          </div>
+          <p className="policyBoundary">
+            The compiler can set only versioned policy fields. Addresses, chain configuration,
+            calldata, quotes, and transaction signing stay outside the AI boundary.
+          </p>
+        </section>
+
         <section className="routePlanner" aria-labelledby="route-planner-title">
           <div className="routePlannerHeader">
             <div>
@@ -778,6 +880,65 @@ async function simulateSwapCandidate(input: {
 function formatPlanUnits(plan: PaymentPlan, amount: bigint): string {
   const decimals = plan.fundingAsset === "USDC" ? 6 : 18;
   return `${formatUnits(amount, decimals)} ${plan.fundingAsset}`;
+}
+
+function plannerPreferences(policy: NormalizedPaymentPolicy) {
+  return {
+    ...(policy.preferredFundingAsset
+      ? { preferredFundingAsset: policy.preferredFundingAsset }
+      : {}),
+    ...(policy.minimumUsdcReserve === undefined
+      ? {}
+      : { minimumUsdcReserve: policy.minimumUsdcReserve }),
+    ...(policy.maxWmonSpend === undefined ? {} : { maxWmonSpend: policy.maxWmonSpend }),
+    ...(policy.maxSwapCostBps === undefined
+      ? {}
+      : { maxSwapCostBps: policy.maxSwapCostBps }),
+  };
+}
+
+function parsePreferenceResponse(value: unknown): ActivePolicy {
+  if (!isRecord(value) || value.status !== "compiled") {
+    throw new Error("Preference service returned an invalid response");
+  }
+  const source = requirePolicySource(value.source);
+  const policy = parsePaymentPolicyV1(value.policy);
+  return {
+    source,
+    policy,
+    normalized: normalizePaymentPolicy(policy),
+    explanations: explainPaymentPolicy(policy),
+    ...(typeof value.warning === "string" ? { warning: value.warning } : {}),
+  };
+}
+
+function requirePolicySource(
+  value: unknown,
+): Extract<PreferenceCompilation, { status: "compiled" }>["source"] {
+  if (value !== "deterministic" && value !== "model"
+    && value !== "deterministic-fallback" && value !== "safe-default") {
+    throw new Error("Preference service returned an invalid source");
+  }
+  return value;
+}
+
+function formatPolicySource(source: ActivePolicy["source"]): string {
+  if (source === "model") return "AI compiled · schema verified";
+  if (source === "deterministic-fallback") return "AI offline · deterministic fallback";
+  if (source === "safe-default") return "Safe default policy";
+  return "Deterministic compiler";
+}
+
+function readPreferenceError(value: unknown): string {
+  if (!isRecord(value)) return "Preference compiler returned an invalid error";
+  if (typeof value.error === "string") return value.error;
+  if (typeof value.message === "string") {
+    const issues = Array.isArray(value.issues)
+      ? value.issues.filter((issue): issue is string => typeof issue === "string")
+      : [];
+    return issues.length ? `${value.message}: ${issues.join("; ")}` : value.message;
+  }
+  return "Preference compiler rejected the request";
 }
 
 function formatPlanMaximum(plan: PaymentPlan): string {

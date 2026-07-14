@@ -24,7 +24,9 @@ export type ConstraintResult = {
     | "quote-available"
     | "quote-fresh"
     | "balance-sufficient"
+    | "usdc-reserve"
     | "maximum-spend"
+    | "swap-cost"
     | "simulation";
   label: string;
   status: ConstraintStatus;
@@ -92,6 +94,8 @@ export type PlannerInput = {
   preferences?: {
     preferredFundingAsset?: FundingAsset;
     maxWmonSpend?: bigint;
+    minimumUsdcReserve?: bigint;
+    maxSwapCostBps?: number;
   };
 };
 
@@ -137,6 +141,18 @@ function buildDirectPlan(input: PlannerInput): PaymentPlan {
     status: input.direct.balance >= input.invoiceAmount ? "pass" : "fail",
     evidence: `${input.direct.balance} available; ${input.invoiceAmount} required`,
   });
+  const minimumReserve = input.preferences?.minimumUsdcReserve;
+  if (minimumReserve !== undefined) {
+    const postPaymentBalance = input.direct.balance >= input.invoiceAmount
+      ? input.direct.balance - input.invoiceAmount
+      : 0n;
+    constraints.push({
+      id: "usdc-reserve",
+      label: "Direct payment preserves the USDC reserve",
+      status: postPaymentBalance >= minimumReserve ? "pass" : "fail",
+      evidence: `${postPaymentBalance} remains; ${minimumReserve} required by policy`,
+    });
+  }
   constraints.push(simulationConstraint(input.direct.simulation));
 
   const estimatedGasUnits = simulationGas(
@@ -215,6 +231,24 @@ function buildSwapPlan(input: PlannerInput): PaymentPlan {
           ? "No additional WMON cap configured"
           : `${maximumSpend} quoted; ${configuredMaximum} allowed`),
   });
+  const maximumSwapCost = input.preferences?.maxSwapCostBps;
+  if (maximumSwapCost !== undefined) {
+    constraints.push({
+      id: "swap-cost",
+      label: "Quote respects the swap-cost cap",
+      status: terminalReason || !quote
+        ? "pending"
+        : quote.swapCostBps === undefined
+          ? "fail"
+          : quote.swapCostBps <= maximumSwapCost ? "pass" : "fail",
+      evidence: terminalReason
+        ?? (!quote
+          ? "Pending executable quote"
+          : quote.swapCostBps === undefined
+            ? "Quote does not contain swap-cost evidence"
+            : `${quote.swapCostBps} bps quoted; ${maximumSwapCost} bps allowed`),
+    });
+  }
   constraints.push(simulationConstraint(input.swap.simulation));
 
   const swapCostBps = quote?.swapCostBps ?? 0;
@@ -375,6 +409,14 @@ function validateInput(input: PlannerInput): void {
   }
   if (input.swap.balance < 0n || input.swap.allowance < 0n) {
     throw new Error("Swap balances cannot be negative");
+  }
+  if ((input.preferences?.minimumUsdcReserve ?? 0n) < 0n) {
+    throw new Error("USDC reserve cannot be negative");
+  }
+  const maxSwapCostBps = input.preferences?.maxSwapCostBps;
+  if (maxSwapCostBps !== undefined
+    && (!Number.isSafeInteger(maxSwapCostBps) || maxSwapCostBps < 0 || maxSwapCostBps > 10_000)) {
+    throw new Error("Swap-cost cap must be an integer from 0 to 10,000 bps");
   }
   if (input.swap.quote?.maxSellAmount !== undefined && input.swap.quote.maxSellAmount <= 0n) {
     throw new Error("Swap maximum must be positive");

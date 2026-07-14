@@ -23,6 +23,9 @@ importers:
       '@blinkpay/planner':
         specifier: workspace:*
         version: link:../../packages/planner
+      '@blinkpay/policy':
+        specifier: workspace:*
+        version: link:../../packages/policy
       '@blinkpay/zerox':
         specifier: workspace:*
         version: link:../../packages/zerox
@@ -103,6 +106,18 @@ importers:
         version: 4.1.10(@types/node@22.20.1)(vite@8.1.4(@types/node@22.20.1)(tsx@4.20.6))
 
   packages/planner:
+    devDependencies:
+      '@types/node':
+        specifier: 22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@22.20.1)(vite@8.1.4(@types/node@22.20.1)(tsx@4.20.6))
+
+  packages/policy:
     devDependencies:
       '@types/node':
         specifier: 22.20.1

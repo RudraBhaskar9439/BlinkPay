@@ -571,6 +571,122 @@ code {
   padding: 4px 0 20px;
 }
 
+.policyCompiler {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1px solid var(--violet);
+  border-radius: 16px;
+  background: rgba(117, 103, 255, 0.07);
+}
+
+.policyCompilerHeader,
+.policyActions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.policyCompilerHeader h2,
+.policyCompilerHeader p,
+.policyActions p,
+.policyBoundary {
+  margin: 0;
+}
+
+.policyCompilerHeader h2 {
+  margin-top: 5px;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.policySource {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: var(--violet);
+  color: white;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.policyInput {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.policyInput textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.policyInput textarea:focus {
+  border-color: var(--violet);
+  box-shadow: 0 0 0 3px rgba(117, 103, 255, 0.14);
+}
+
+.policyExamples {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.policyExamples button {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.policyActions p,
+.policyBoundary {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.policyRules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.policyRules article {
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.policyRules strong {
+  font-size: 12px;
+}
+
+.policyRules span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 .routePlanner {
   display: grid;
   gap: 16px;
@@ -908,6 +1024,16 @@ code {
   .routePlannerHeader {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .policyCompilerHeader,
+  .policyActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .policyRules {
+    grid-template-columns: 1fr;
   }
 
   .portfolioEvidence,

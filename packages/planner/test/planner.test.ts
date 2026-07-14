@@ -109,6 +109,23 @@ describe("deterministic payment planner", () => {
     expect(result.plans.every((plan) => plan.status === "eligible")).toBe(true);
   });
 
+  it("rejects direct payment when it would consume the required USDC reserve", () => {
+    const result = buildPaymentPlans(input({
+      preferences: { minimumUsdcReserve: 850_000n },
+    }));
+    const direct = result.plans.find((plan) => plan.id === "direct-usdc");
+    expect(direct?.status).toBe("unavailable");
+    expect(direct?.rejectionReasons.join(" ")).toContain("USDC reserve");
+    expect(result.recommendedPlanId).toBe("swap-wmon");
+  });
+
+  it("rejects a swap above the policy cost cap", () => {
+    const result = buildPaymentPlans(input({ preferences: { maxSwapCostBps: 100 } }));
+    const swap = result.plans.find((plan) => plan.id === "swap-wmon");
+    expect(swap?.status).toBe("unavailable");
+    expect(swap?.rejectionReasons.join(" ")).toContain("131 bps quoted; 100 bps allowed");
+  });
+
   it("rejects both routes after the invoice has been paid", () => {
     const result = buildPaymentPlans(input({ invoiceAlreadyPaid: true }));
     expect(result.recommendedPlanId).toBeUndefined();

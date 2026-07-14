@@ -46,6 +46,9 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 2D: complete direct and WMON wallet-to-wallet payments
 - [x] Phase 3A: deterministic portfolio discovery and route engine
 - [x] Phase 3B: live wallet planner acceptance matrix
+- [x] Phase 4A: strict natural-language policy compiler and planner constraints
+- [x] Phase 4B: isolated OpenAI Structured Outputs adapter with safe fallback
+- [ ] Phase 4C: live wallet preference-switch acceptance matrix
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
@@ -60,6 +63,12 @@ and replay state; simulates executable routes; and displays deterministic costs,
 constraints, rejection evidence, and ranking. See
 [docs/PHASE_3_REPORT.md](docs/PHASE_3_REPORT.md) for the scoring model and the
 completed manual wallet matrix.
+
+Phase 4 compiles payer language into a versioned, strictly validated policy.
+Only documented policy fields reach the planner; executable configuration and
+transaction construction remain outside the AI boundary. See
+[docs/PHASE_4_REPORT.md](docs/PHASE_4_REPORT.md) for the schema, threat boundary,
+fallback behavior, and remaining wallet acceptance gate.
 
 ## Local development
 
@@ -89,6 +98,7 @@ packages/chain/            Monad clients, addresses, and configuration tests
 packages/core/             EIP-712 invoice types, encoding, ABI, and tests
 packages/contracts/        Foundry contracts and Solidity tests
 packages/planner/          Typed deterministic discovery, filtering, and ranking
+packages/policy/           Strict preference schema, compiler, and AI adapter
 docs/                      Architecture and phase evidence
 .github/workflows/ci.yml   Reproducible quality gate
 ```

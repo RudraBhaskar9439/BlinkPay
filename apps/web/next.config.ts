@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
     "@blinkpay/chain",
     "@blinkpay/core",
     "@blinkpay/planner",
+    "@blinkpay/policy",
     "@blinkpay/zerox",
   ],
 };

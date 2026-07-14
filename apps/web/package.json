@@ -13,6 +13,7 @@
     "@blinkpay/chain": "workspace:*",
     "@blinkpay/core": "workspace:*",
     "@blinkpay/planner": "workspace:*",
+    "@blinkpay/policy": "workspace:*",
     "@blinkpay/zerox": "workspace:*",
     "dotenv": "17.2.3",
     "next": "16.2.10",
