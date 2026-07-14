@@ -25,6 +25,18 @@ function input(overrides: Partial<PlannerInput> = {}): PlannerInput {
       },
       simulation: { status: "requires-approval" },
     },
+    vault: {
+      balance: 500_000_000n,
+      allowance: 0n,
+      assetValue: 500_000_000n,
+      maxWithdraw: 500_000_000n,
+      previewShares: 100_000n,
+      maxShares: 100_500n,
+      shareDecimals: 6,
+      verified: true,
+      assetMatches: true,
+      simulation: { status: "requires-approval" },
+    },
     ...overrides,
   };
 }
@@ -42,7 +54,7 @@ describe("deterministic payment planner", () => {
     const direct = result.plans.find((plan) => plan.id === "direct-usdc");
     expect(direct?.status).toBe("unavailable");
     expect(direct?.rejectionReasons.join(" ")).toContain("USDC balance");
-    expect(result.recommendedPlanId).toBe("swap-wmon");
+    expect(result.recommendedPlanId).toBe("vault-usdc");
   });
 
   it("rejects a quote above the configured WMON cap", () => {
@@ -116,7 +128,7 @@ describe("deterministic payment planner", () => {
     const direct = result.plans.find((plan) => plan.id === "direct-usdc");
     expect(direct?.status).toBe("unavailable");
     expect(direct?.rejectionReasons.join(" ")).toContain("USDC reserve");
-    expect(result.recommendedPlanId).toBe("swap-wmon");
+    expect(result.recommendedPlanId).toBe("vault-usdc");
   });
 
   it("rejects a swap above the policy cost cap", () => {
@@ -132,5 +144,63 @@ describe("deterministic payment planner", () => {
     expect(result.plans.every((plan) => plan.status === "unavailable")).toBe(true);
     expect(result.plans.find((plan) => plan.id === "swap-wmon")?.rejectionReasons)
       .toEqual(["Invoice has not been paid: Router reports paid"]);
+  });
+
+  it("recommends the vault when wallet USDC and WMON routes are unavailable", () => {
+    const base = input();
+    const result = buildPaymentPlans({
+      ...base,
+      direct: {
+        balance: 0n,
+        allowance: 0n,
+        simulation: { status: "requires-approval" },
+      },
+      swap: {
+        ...base.swap,
+        balance: 0n,
+      },
+    });
+
+    expect(result.recommendedPlanId).toBe("vault-usdc");
+    expect(result.plans.find((plan) => plan.id === "vault-usdc")?.status).toBe("eligible");
+  });
+
+  it("rejects a vault route when maxWithdraw is below the invoice", () => {
+    const base = input();
+    const result = buildPaymentPlans({
+      ...base,
+      vault: { ...base.vault!, maxWithdraw: base.invoiceAmount - 1n },
+    });
+    const vault = result.plans.find((plan) => plan.id === "vault-usdc");
+
+    expect(vault?.status).toBe("unavailable");
+    expect(vault?.rejectionReasons.join(" ")).toContain("maxWithdraw");
+  });
+
+  it("rejects an unverified vault or wrong underlying asset", () => {
+    const base = input();
+    const unverified = buildPaymentPlans({
+      ...base,
+      vault: { ...base.vault!, verified: false, readError: "Router vault mismatch" },
+    }).plans.find((plan) => plan.id === "vault-usdc");
+    const wrongAsset = buildPaymentPlans({
+      ...base,
+      vault: { ...base.vault!, assetMatches: false },
+    }).plans.find((plan) => plan.id === "vault-usdc");
+
+    expect(unverified?.rejectionReasons.join(" ")).toContain("Router vault mismatch");
+    expect(wrongAsset?.rejectionReasons.join(" ")).toContain("asset mismatch");
+  });
+
+  it("rejects a protected share maximum below previewWithdraw", () => {
+    const base = input();
+    const result = buildPaymentPlans({
+      ...base,
+      vault: { ...base.vault!, maxShares: base.vault!.previewShares - 1n },
+    });
+    const vault = result.plans.find((plan) => plan.id === "vault-usdc");
+
+    expect(vault?.status).toBe("unavailable");
+    expect(vault?.rejectionReasons.join(" ")).toContain("Share cap");
   });
 });

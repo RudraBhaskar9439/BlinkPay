@@ -13,13 +13,27 @@ export const blinkPayRouterAbi = parseAbi([
   "struct Invoice { bytes32 invoiceId; address merchant; address settlementToken; uint256 amount; uint256 expiry; uint256 nonce; uint256 chainId; bytes32 metadataHash; }",
   "function payDirect(Invoice invoice, bytes merchantSignature)",
   "function payWithSwap(Invoice invoice, bytes merchantSignature, uint256 maxSellAmount, uint256 quoteDeadline, bytes swapCallData)",
+  "function payFromVault(Invoice invoice, bytes merchantSignature, uint256 maxShares)",
   "function paidInvoices(bytes32 invoiceId) view returns (bool)",
   "function settlementAsset() view returns (address)",
   "function sellAsset() view returns (address)",
   "function swapTarget() view returns (address)",
   "function allowanceTarget() view returns (address)",
+  "function vaultAsset() view returns (address)",
   "function allowedSwapSelectors(bytes4 selector) view returns (bool)",
   "event PaymentSettled(bytes32 indexed invoiceId, address indexed payer, address indexed merchant, address settlementToken, uint256 settlementAmount, uint256 merchantNonce)",
+  "event VaultPaymentSettled(bytes32 indexed invoiceId, address indexed payer, address indexed vault, uint256 settlementAmount, uint256 maximumShares, uint256 sharesRedeemed)",
+]);
+
+export const erc4626Abi = parseAbi([
+  "function asset() view returns (address)",
+  "function balanceOf(address account) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function decimals() view returns (uint8)",
+  "function convertToAssets(uint256 shares) view returns (uint256)",
+  "function previewWithdraw(uint256 assets) view returns (uint256)",
+  "function maxWithdraw(address owner) view returns (uint256)",
 ]);
 
 export const blinkPayTestnetPoolAbi = parseAbi([

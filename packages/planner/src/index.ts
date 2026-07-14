@@ -1,5 +1,5 @@
-export type FundingAsset = "USDC" | "WMON";
-export type RouteKind = "direct" | "exact-output-swap";
+export type FundingAsset = "USDC" | "WMON" | "VAULT_USDC";
+export type RouteKind = "direct" | "exact-output-swap" | "erc4626-withdraw";
 export type PlanStatus = "eligible" | "unavailable";
 export type ConstraintStatus = "pass" | "pending" | "fail";
 
@@ -15,6 +15,14 @@ export type PortfolioSnapshot = {
   nativeBalance: bigint;
   usdc: { balance: bigint; allowance: bigint };
   wmon: { balance: bigint; allowance: bigint };
+  vault?: {
+    address: string;
+    shares: bigint;
+    allowance: bigint;
+    assets: bigint;
+    maxWithdraw: bigint;
+    shareDecimals: number;
+  };
 };
 
 export type ConstraintResult = {
@@ -27,6 +35,9 @@ export type ConstraintResult = {
     | "usdc-reserve"
     | "maximum-spend"
     | "swap-cost"
+    | "vault-verified"
+    | "vault-asset"
+    | "vault-liquidity"
     | "simulation";
   label: string;
   status: ConstraintStatus;
@@ -48,9 +59,10 @@ export type RouteCost = {
 };
 
 export type PaymentPlan = {
-  id: "direct-usdc" | "swap-wmon";
+  id: "direct-usdc" | "swap-wmon" | "vault-usdc";
   kind: RouteKind;
   fundingAsset: FundingAsset;
+  decimals: number;
   status: PlanStatus;
   rank?: number;
   requiredAmount: bigint;
@@ -91,6 +103,19 @@ export type PlannerInput = {
     quoteError?: string;
     simulation: SimulationResult;
   };
+  vault?: {
+    balance: bigint;
+    allowance: bigint;
+    assetValue: bigint;
+    maxWithdraw: bigint;
+    previewShares: bigint;
+    maxShares: bigint;
+    shareDecimals: number;
+    verified: boolean;
+    assetMatches: boolean;
+    readError?: string;
+    simulation: SimulationResult;
+  };
   preferences?: {
     preferredFundingAsset?: FundingAsset;
     maxWmonSpend?: bigint;
@@ -107,11 +132,12 @@ export type PlannerResult = {
 const APPROVAL_GAS_UNITS = 65_000n;
 const DIRECT_GAS_UNITS = 120_000n;
 const SWAP_GAS_UNITS = 400_000n;
+const VAULT_GAS_UNITS = 260_000n;
 
 export function buildPaymentPlans(input: PlannerInput): PlannerResult {
   validateInput(input);
 
-  const plans = [buildDirectPlan(input), buildSwapPlan(input)];
+  const plans = [buildDirectPlan(input), buildSwapPlan(input), buildVaultPlan(input)];
   const eligiblePlans = plans
     .filter((plan) => plan.status === "eligible")
     .sort(comparePlans);
@@ -130,6 +156,100 @@ export function buildPaymentPlans(input: PlannerInput): PlannerResult {
     plans,
     ...(recommended ? { recommendedPlanId: recommended.id } : {}),
   };
+}
+
+function buildVaultPlan(input: PlannerInput): PaymentPlan {
+  const vault = input.vault;
+  const terminalReason = input.invoiceAlreadyPaid
+    ? "Skipped because the router reports this invoice paid"
+    : input.invoiceExpiry < input.now
+      ? "Skipped because the invoice has expired"
+      : undefined;
+  const maximumSpend = vault?.maxShares ?? 0n;
+  const approvalRequired = vault !== undefined && vault.allowance < maximumSpend;
+  const constraints = commonConstraints(input);
+  constraints.push({
+    id: "vault-verified",
+    label: "Vault is the router's allowlisted ERC-4626 position",
+    status: terminalReason ? "pending" : vault?.verified ? "pass" : "fail",
+    evidence: terminalReason
+      ?? (vault?.verified
+        ? "Configured vault matches the router's immutable vault"
+        : (vault?.readError ?? "Configured vault could not be verified")),
+  });
+  constraints.push({
+    id: "vault-asset",
+    label: "Vault underlying asset matches invoice USDC",
+    status: terminalReason || !vault?.verified
+      ? "pending"
+      : vault.assetMatches ? "pass" : "fail",
+    evidence: terminalReason
+      ?? (!vault?.verified
+        ? "Pending verified vault"
+        : vault.assetMatches ? "vault.asset() equals settlement token" : "Vault asset mismatch"),
+  });
+  constraints.push({
+    id: "vault-liquidity",
+    label: "Vault maxWithdraw covers the invoice",
+    status: terminalReason || !vault?.verified
+      ? "pending"
+      : vault.maxWithdraw >= input.invoiceAmount ? "pass" : "fail",
+    evidence: terminalReason
+      ?? (!vault?.verified
+        ? "Pending verified vault"
+        : `${vault.maxWithdraw} withdrawable; ${input.invoiceAmount} required`),
+  });
+  constraints.push({
+    id: "balance-sufficient",
+    label: "Vault share balance covers the protected maximum",
+    status: terminalReason || !vault?.verified
+      ? "pending"
+      : maximumSpend > 0n && vault.balance >= maximumSpend ? "pass" : "fail",
+    evidence: terminalReason
+      ?? (!vault?.verified
+        ? "Pending verified vault"
+        : `${vault.balance} shares available; ${maximumSpend} maximum`),
+  });
+  constraints.push({
+    id: "maximum-spend",
+    label: "Share cap covers the current preview",
+    status: terminalReason || !vault?.verified
+      ? "pending"
+      : vault.previewShares > 0n && maximumSpend >= vault.previewShares ? "pass" : "fail",
+    evidence: terminalReason
+      ?? (!vault?.verified
+        ? "Pending verified vault"
+        : `${vault.previewShares} previewed; ${maximumSpend} maximum`),
+  });
+  constraints.push(simulationConstraint(vault?.simulation ?? {
+    status: "not-run",
+    reason: vault?.readError ?? "Vault has not been discovered",
+  }));
+
+  const estimatedGasUnits = simulationGas(
+    vault?.simulation ?? { status: "not-run" },
+    VAULT_GAS_UNITS,
+    approvalRequired,
+  );
+  const preferencePenalty = preferencePenaltyFor("VAULT_USDC", input);
+  const cost = buildCost(estimatedGasUnits, approvalRequired, 0, preferencePenalty);
+
+  return finalizePlan({
+    id: "vault-usdc",
+    kind: "erc4626-withdraw",
+    fundingAsset: "VAULT_USDC",
+    decimals: vault?.shareDecimals ?? 18,
+    requiredAmount: input.invoiceAmount,
+    maximumSpend,
+    ...(vault ? { estimatedSpend: vault.previewShares } : {}),
+    balance: vault?.balance ?? 0n,
+    allowance: vault?.allowance ?? 0n,
+    approvalRequired,
+    simulation: vault?.simulation ?? { status: "not-run" },
+    steps: approvalAndPaymentSteps("VAULT_USDC", approvalRequired, constraints),
+    constraints,
+    cost,
+  });
 }
 
 function buildDirectPlan(input: PlannerInput): PaymentPlan {
@@ -167,6 +287,7 @@ function buildDirectPlan(input: PlannerInput): PaymentPlan {
     id: "direct-usdc",
     kind: "direct",
     fundingAsset: "USDC",
+    decimals: 6,
     requiredAmount: input.invoiceAmount,
     maximumSpend: input.invoiceAmount,
     balance: input.direct.balance,
@@ -269,6 +390,7 @@ function buildSwapPlan(input: PlannerInput): PaymentPlan {
     id: "swap-wmon",
     kind: "exact-output-swap",
     fundingAsset: "WMON",
+    decimals: 18,
     requiredAmount: input.invoiceAmount,
     maximumSpend,
     ...(quote ? {
@@ -340,7 +462,7 @@ function approvalAndPaymentSteps(
   return [
     {
       kind: "approval",
-      label: `Approve ${asset} maximum`,
+      label: `Approve ${asset === "VAULT_USDC" ? "vault shares" : asset} maximum`,
       status: approvalRequired ? "required" : "satisfied",
     },
     {
@@ -375,6 +497,7 @@ function simulationGas(
 
 function preferencePenaltyFor(asset: FundingAsset, input: PlannerInput): number {
   const preferred = input.preferences?.preferredFundingAsset ?? "USDC";
+  if (asset === "VAULT_USDC") return preferred === "USDC" ? 250 : 1_000;
   return asset === preferred ? 0 : 1_000;
 }
 
@@ -409,6 +532,22 @@ function validateInput(input: PlannerInput): void {
   }
   if (input.swap.balance < 0n || input.swap.allowance < 0n) {
     throw new Error("Swap balances cannot be negative");
+  }
+  if (input.vault && [
+    input.vault.balance,
+    input.vault.allowance,
+    input.vault.assetValue,
+    input.vault.maxWithdraw,
+    input.vault.previewShares,
+    input.vault.maxShares,
+  ].some((value) => value < 0n)) {
+    throw new Error("Vault facts cannot be negative");
+  }
+  if (input.vault
+    && (!Number.isSafeInteger(input.vault.shareDecimals)
+      || input.vault.shareDecimals < 0
+      || input.vault.shareDecimals > 36)) {
+    throw new Error("Vault share decimals must be an integer from 0 to 36");
   }
   if ((input.preferences?.minimumUsdcReserve ?? 0n) < 0n) {
     throw new Error("USDC reserve cannot be negative");

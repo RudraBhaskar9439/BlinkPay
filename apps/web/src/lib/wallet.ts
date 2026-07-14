@@ -37,6 +37,18 @@ export function getConfiguredTestnetPoolAddress(): Address {
   return getAddress(value);
 }
 
+export function getConfiguredVaultAddress(): Address {
+  const deployment = blinkPayTestnetDeployment as typeof blinkPayTestnetDeployment & {
+    vault?: Address;
+  };
+  const value = process.env.NEXT_PUBLIC_BLINKPAY_VAULT_ADDRESS
+    ?? (activeMonadNetwork === "testnet" ? deployment.vault : undefined);
+  if (!value || !isAddress(value, { strict: true })) {
+    throw new Error("BlinkPay ERC-4626 vault is not configured for this deployment");
+  }
+  return getAddress(value);
+}
+
 export function formatAddress(address: Address): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }

@@ -10,6 +10,7 @@ import {
   blinkPayRouterAbi,
   buildInvoiceTypedData,
   decodeSignedInvoice,
+  erc4626Abi,
   type Invoice,
   type SignedInvoice,
 } from "@blinkpay/core";
@@ -34,6 +35,7 @@ import {
   connectInjectedWallet,
   formatAddress,
   getConfiguredRouterAddress,
+  getConfiguredVaultAddress,
   getErrorMessage,
   watchInjectedAccount,
 } from "@/lib/wallet";
@@ -64,6 +66,21 @@ type SwapQuote = {
 };
 
 type RouteAnalysis = PlannerResult & { portfolio: PortfolioSnapshot };
+
+type VaultFacts = {
+  address: Address;
+  verified: boolean;
+  assetMatches: boolean;
+  shares: bigint;
+  allowance: bigint;
+  assetValue: bigint;
+  maxWithdraw: bigint;
+  previewShares: bigint;
+  maxShares: bigint;
+  shareDecimals: number;
+};
+
+const VAULT_SHARE_BUFFER_BPS = 50n;
 
 type ActivePolicy = {
   source: Extract<PreferenceCompilation, { status: "compiled" }>["source"];
@@ -127,8 +144,10 @@ export function PayInvoice({ payload }: { payload?: string }) {
   const displayAmount = formatUnits(invoice.amount, 6);
   const directPlan = routeAnalysis?.plans.find((plan) => plan.id === "direct-usdc");
   const swapPlan = routeAnalysis?.plans.find((plan) => plan.id === "swap-wmon");
+  const vaultPlan = routeAnalysis?.plans.find((plan) => plan.id === "vault-usdc");
   const directUnavailable = directPlan?.status === "unavailable";
   const swapUnavailable = swapPlan?.status === "unavailable";
+  const vaultUnavailable = vaultPlan?.status === "unavailable";
   const expiry = new Date(Number(invoice.expiry) * 1_000).toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -229,6 +248,19 @@ export function PayInvoice({ payload }: { payload?: string }) {
       ]);
 
       const now = getCurrentUnixTime();
+      let vaultFacts: VaultFacts | undefined;
+      let vaultReadError: string | undefined;
+      try {
+        vaultFacts = await readVaultFacts({
+          client,
+          routerAddress,
+          account: wallet.account,
+          settlementToken: invoice.settlementToken,
+          invoiceAmount: invoice.amount,
+        });
+      } catch (error) {
+        vaultReadError = getErrorMessage(error);
+      }
       let quote: SwapQuote | undefined;
       let quoteError: string | undefined;
       if (!invoiceAlreadyPaid && invoice.expiry >= now) {
@@ -263,6 +295,15 @@ export function PayInvoice({ payload }: { payload?: string }) {
         allowance: wmonAllowance,
         quote,
       });
+      const vaultSimulation = await simulateVaultCandidate({
+        client,
+        routerAddress,
+        account: wallet.account,
+        signedInvoice,
+        invoiceAlreadyPaid,
+        now,
+        facts: vaultFacts,
+      });
 
       const portfolio: PortfolioSnapshot = {
         account: wallet.account,
@@ -270,6 +311,16 @@ export function PayInvoice({ payload }: { payload?: string }) {
         nativeBalance,
         usdc: { balance: usdcBalance, allowance: usdcAllowance },
         wmon: { balance: wmonBalance, allowance: wmonAllowance },
+        ...(vaultFacts ? {
+          vault: {
+            address: vaultFacts.address,
+            shares: vaultFacts.shares,
+            allowance: vaultFacts.allowance,
+            assets: vaultFacts.assetValue,
+            maxWithdraw: vaultFacts.maxWithdraw,
+            shareDecimals: vaultFacts.shareDecimals,
+          },
+        } : {}),
       };
       const result = buildPaymentPlans({
         now,
@@ -293,6 +344,30 @@ export function PayInvoice({ payload }: { payload?: string }) {
             },
           } : { quoteError: quoteError ?? "Unable to obtain a quote" }),
           simulation: swapSimulation,
+        },
+        vault: vaultFacts ? {
+          balance: vaultFacts.shares,
+          allowance: vaultFacts.allowance,
+          assetValue: vaultFacts.assetValue,
+          maxWithdraw: vaultFacts.maxWithdraw,
+          previewShares: vaultFacts.previewShares,
+          maxShares: vaultFacts.maxShares,
+          shareDecimals: vaultFacts.shareDecimals,
+          verified: vaultFacts.verified,
+          assetMatches: vaultFacts.assetMatches,
+          simulation: vaultSimulation,
+        } : {
+          balance: 0n,
+          allowance: 0n,
+          assetValue: 0n,
+          maxWithdraw: 0n,
+          previewShares: 0n,
+          maxShares: 0n,
+          shareDecimals: 18,
+          verified: false,
+          assetMatches: false,
+          readError: vaultReadError ?? "Vault facts are unavailable",
+          simulation: vaultSimulation,
         },
         preferences: plannerPreferences(activePolicy.normalized),
       });
@@ -549,6 +624,94 @@ export function PayInvoice({ payload }: { payload?: string }) {
     }
   }
 
+  async function payFromVault() {
+    setBusy(true);
+    setTransactionHash(undefined);
+
+    try {
+      const routerAddress = getConfiguredRouterAddress();
+      const signatureValid = await verifyTypedData({
+        address: invoice.merchant,
+        signature,
+        ...buildInvoiceTypedData(invoice, routerAddress),
+      });
+      if (!signatureValid) throw new Error("Merchant signature is invalid for this router");
+
+      const wallet = await connectInjectedWallet();
+      const client = createMonadPublicClient(activeMonadNetwork);
+      setAccount(wallet.account);
+      setMessage("Verifying the allowlisted vault, liquidity, shares, and allowance…");
+
+      const [alreadyPaid, facts] = await Promise.all([
+        client.readContract({
+          address: routerAddress,
+          abi: blinkPayRouterAbi,
+          functionName: "paidInvoices",
+          args: [invoice.invoiceId],
+        }),
+        readVaultFacts({
+          client,
+          routerAddress,
+          account: wallet.account,
+          settlementToken: invoice.settlementToken,
+          invoiceAmount: invoice.amount,
+        }),
+      ]);
+
+      if (alreadyPaid) throw new Error("This invoice has already been paid");
+      if (!facts.verified) throw new Error("The router vault does not match the configured allowlist");
+      if (!facts.assetMatches) throw new Error("The vault underlying asset is not invoice USDC");
+      if (facts.maxWithdraw < invoice.amount) {
+        throw new Error(`The vault can withdraw only ${formatUnits(facts.maxWithdraw, 6)} USDC`);
+      }
+      if (facts.shares < facts.maxShares) {
+        throw new Error("Your vault share balance does not cover the protected maximum");
+      }
+
+      const maximum = formatUnits(facts.maxShares, facts.shareDecimals);
+      if (facts.allowance < facts.maxShares) {
+        setMessage(`Approve at most ${maximum} vault shares for this invoice…`);
+        const approvalHash = await wallet.walletClient.writeContract({
+          address: facts.address,
+          abi: erc4626Abi,
+          functionName: "approve",
+          args: [routerAddress, facts.maxShares],
+          account: wallet.account,
+          chain: activeMonadChain,
+        });
+        await client.waitForTransactionReceipt({ hash: approvalHash });
+      }
+
+      setMessage("Approval confirmed. Simulating exact vault redemption onchain…");
+      await client.estimateContractGas({
+        address: routerAddress,
+        abi: blinkPayRouterAbi,
+        functionName: "payFromVault",
+        args: [invoice, signature, facts.maxShares],
+        account: wallet.account,
+      });
+
+      setMessage("Preflight passed. Redeem only the required USDC in your wallet…");
+      const paymentHash = await wallet.walletClient.writeContract({
+        address: routerAddress,
+        abi: blinkPayRouterAbi,
+        functionName: "payFromVault",
+        args: [invoice, signature, facts.maxShares],
+        account: wallet.account,
+        chain: activeMonadChain,
+      });
+      const receipt = await client.waitForTransactionReceipt({ hash: paymentHash });
+      if (receipt.status !== "success") throw new Error("Vault payment transaction reverted");
+
+      setTransactionHash(paymentHash);
+      setMessage(`Merchant received exactly ${displayAmount} USDC from your vault position.`);
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="checkoutShell" aria-labelledby="pay-title">
       <div className="checkoutIntro compactIntro">
@@ -655,6 +818,12 @@ export function PayInvoice({ payload }: { payload?: string }) {
                 <div><span>MON</span><strong>{formatUnits(routeAnalysis.portfolio.nativeBalance, 18)}</strong></div>
                 <div><span>USDC</span><strong>{formatUnits(routeAnalysis.portfolio.usdc.balance, 6)}</strong></div>
                 <div><span>WMON</span><strong>{formatUnits(routeAnalysis.portfolio.wmon.balance, 18)}</strong></div>
+                <div>
+                  <span>Vault position</span>
+                  <strong>{routeAnalysis.portfolio.vault
+                    ? `${formatUnits(routeAnalysis.portfolio.vault.assets, 6)} USDC`
+                    : "Unavailable"}</strong>
+                </div>
               </div>
 
               <div className="planEvidenceGrid">
@@ -666,7 +835,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
                     <div className="planEvidenceTitle">
                       <div>
                         <span>{plan.status === "eligible" ? "Eligible" : "Unavailable"}</span>
-                        <h3>{plan.fundingAsset} · {plan.kind === "direct" ? "Direct" : "Exact output"}</h3>
+                        <h3>{formatFundingAsset(plan)} · {formatRouteKind(plan)}</h3>
                       </div>
                       {plan.rank ? <strong>#{plan.rank}</strong> : null}
                     </div>
@@ -768,6 +937,33 @@ export function PayInvoice({ payload }: { payload?: string }) {
                 </button>
               ) : null}
             </div>
+          </article>
+
+          <article
+            className={`routeCard ${
+              routeAnalysis?.recommendedPlanId === "vault-usdc" ? "featuredRoute" : ""
+            }`}
+          >
+            <p className="cardLabel">Route 03 · ERC-4626</p>
+            <h2>Pay from vault shares</h2>
+            <p>Redeem only the USDC required by this invoice. Remaining shares stay invested.</p>
+            {vaultPlan && vaultPlan.maximumSpend > 0n ? (
+              <div className="quoteFacts">
+                <span>Protected maximum</span>
+                <strong>{formatPlanUnits(vaultPlan, vaultPlan.maximumSpend)}</strong>
+                {vaultPlan.estimatedSpend !== undefined ? (
+                  <small>Current preview {formatPlanUnits(vaultPlan, vaultPlan.estimatedSpend)}</small>
+                ) : null}
+              </div>
+            ) : null}
+            <button
+              className="primaryButton"
+              type="button"
+              onClick={payFromVault}
+              disabled={busy || vaultUnavailable || !vaultPlan}
+            >
+              {vaultUnavailable ? "Route unavailable" : busy ? "Preflighting…" : "Pay from vault"}
+            </button>
           </article>
         </div>
 
@@ -880,9 +1076,129 @@ async function simulateSwapCandidate(input: {
   }
 }
 
+async function readVaultFacts(input: {
+  client: MonadPublicClient;
+  routerAddress: Address;
+  account: Address;
+  settlementToken: Address;
+  invoiceAmount: bigint;
+}): Promise<VaultFacts> {
+  const configuredVault = getConfiguredVaultAddress();
+  const routerVault = await input.client.readContract({
+    address: input.routerAddress,
+    abi: blinkPayRouterAbi,
+    functionName: "vaultAsset",
+  });
+  const bytecode = await input.client.getBytecode({ address: routerVault });
+  const [underlyingAsset, shares, allowance, shareDecimals, maxWithdraw, previewShares] =
+    await Promise.all([
+      input.client.readContract({
+        address: routerVault,
+        abi: erc4626Abi,
+        functionName: "asset",
+      }),
+      input.client.readContract({
+        address: routerVault,
+        abi: erc4626Abi,
+        functionName: "balanceOf",
+        args: [input.account],
+      }),
+      input.client.readContract({
+        address: routerVault,
+        abi: erc4626Abi,
+        functionName: "allowance",
+        args: [input.account, input.routerAddress],
+      }),
+      input.client.readContract({
+        address: routerVault,
+        abi: erc4626Abi,
+        functionName: "decimals",
+      }),
+      input.client.readContract({
+        address: routerVault,
+        abi: erc4626Abi,
+        functionName: "maxWithdraw",
+        args: [input.account],
+      }),
+      input.client.readContract({
+        address: routerVault,
+        abi: erc4626Abi,
+        functionName: "previewWithdraw",
+        args: [input.invoiceAmount],
+      }),
+    ]);
+  const assetValue = await input.client.readContract({
+    address: routerVault,
+    abi: erc4626Abi,
+    functionName: "convertToAssets",
+    args: [shares],
+  });
+
+  return {
+    address: routerVault,
+    verified: getAddress(routerVault) === getAddress(configuredVault) && bytecode !== undefined,
+    assetMatches: getAddress(underlyingAsset) === getAddress(input.settlementToken),
+    shares,
+    allowance,
+    assetValue,
+    maxWithdraw,
+    previewShares,
+    maxShares: addBasisPointBuffer(previewShares, VAULT_SHARE_BUFFER_BPS),
+    shareDecimals: Number(shareDecimals),
+  };
+}
+
+async function simulateVaultCandidate(input: {
+  client: MonadPublicClient;
+  routerAddress: Address;
+  account: Address;
+  signedInvoice: SignedInvoice;
+  invoiceAlreadyPaid: boolean;
+  now: bigint;
+  facts?: VaultFacts;
+}): Promise<SimulationResult> {
+  const { invoice, signature } = input.signedInvoice;
+  const facts = input.facts;
+  if (
+    input.invoiceAlreadyPaid || invoice.expiry < input.now || !facts || !facts.verified
+      || !facts.assetMatches || facts.maxWithdraw < invoice.amount
+      || facts.shares < facts.maxShares || facts.maxShares === 0n
+  ) {
+    return { status: "not-run" };
+  }
+  if (facts.allowance < facts.maxShares) return { status: "requires-approval" };
+
+  try {
+    const gasEstimate = await input.client.estimateContractGas({
+      address: input.routerAddress,
+      abi: blinkPayRouterAbi,
+      functionName: "payFromVault",
+      args: [invoice, signature, facts.maxShares],
+      account: input.account,
+    });
+    return { status: "passed", gasEstimate };
+  } catch (error) {
+    return { status: "failed", reason: getErrorMessage(error) };
+  }
+}
+
+function addBasisPointBuffer(amount: bigint, basisPoints: bigint): bigint {
+  if (amount <= 0n) return 0n;
+  return amount + (amount * basisPoints + 9_999n) / 10_000n;
+}
+
 function formatPlanUnits(plan: PaymentPlan, amount: bigint): string {
-  const decimals = plan.fundingAsset === "USDC" ? 6 : 18;
-  return `${formatUnits(amount, decimals)} ${plan.fundingAsset}`;
+  return `${formatUnits(amount, plan.decimals)} ${formatFundingAsset(plan)}`;
+}
+
+function formatFundingAsset(plan: PaymentPlan): string {
+  return plan.fundingAsset === "VAULT_USDC" ? "USDC vault shares" : plan.fundingAsset;
+}
+
+function formatRouteKind(plan: PaymentPlan): string {
+  if (plan.kind === "direct") return "Direct";
+  if (plan.kind === "erc4626-withdraw") return "Exact redeem";
+  return "Exact output";
 }
 
 function plannerPreferences(policy: NormalizedPaymentPolicy) {
