@@ -10,10 +10,10 @@ the same validation boundary. If the provider is missing, unavailable, refuses,
 returns incomplete output, or returns malformed output, BlinkPay remains usable
 through a deterministic fallback or the safe default policy.
 
-The final Phase 4C wallet acceptance matrix remains open. It requires the payer
-to analyze the same fresh invoice once with **Preserve MON** and once with
-**Preserve USDC**, then confirm that route facts stay unchanged while only the
-documented preference rule and recommendation change.
+Phase 4C is complete. The payer analyzed the same fresh invoice once with
+**Preserve MON** and once with **Preserve USDC**. Live balances, quote evidence,
+gas assumptions, eligibility, and swap cost remained unchanged while the
+documented preference penalty and recommendation switched routes.
 
 ## Versioned policy
 
@@ -125,17 +125,21 @@ server-only `/api/preferences` endpoint.
 
 ## Phase 4C manual acceptance
 
-1. Add the Groq key locally as `LLM_API_KEY` or `GROQ_API_KEY`. Keep the supplied
-   `LLM_BASE_URL` and `LLM_MODEL` values. Never paste or commit the key.
-2. Create one fresh `0.1 USDC` invoice and open it with the payer wallet.
-3. Choose **Preserve MON**, compile the policy, and analyze wallet routes.
-4. Record balances, maximums, gas, swap cost, eligibility, scores, and rank.
-5. Choose **Preserve USDC**, compile, and analyze the same unpaid invoice again.
-6. Confirm the recorded route facts are unchanged, the visible preference rule
-   changes, and the recommendation switches from direct USDC to WMON when both
-   routes remain eligible.
-7. Confirm no wallet signature request occurs during compilation or analysis.
+The matrix passed on Monad testnet on July 15, 2026 with the same unpaid `0.1
+USDC` invoice and payer wallet:
 
-Once this matrix is captured, Phase 4 passes its exit gate: AI output influences
-only documented policy fields, and every onchain transaction still requires
-explicit wallet review and signature.
+- Live facts stayed fixed at `1.282351092315835636 MON`, `0.8 USDC`, and
+  `0.048986859568604804 WMON`. The WMON maximum stayed
+  `0.001039017113929055`, direct and swap gas estimates stayed `185000` and
+  `465000`, and swap cost stayed `132 bps`.
+- **Preserve MON** preferred direct USDC. Direct ranked `#1` at score `28`; WMON
+  ranked `#2` at score `1188`.
+- **Preserve USDC** preferred WMON. The corrected rerun switched WMON to `#1`
+  at score `188` and direct USDC to `#2` at score `1028` without changing any
+  candidate fact or hard constraint.
+- Compilation and analysis requested no wallet signature and submitted no
+  transaction.
+
+Phase 4 passes its exit gate: AI output influences only documented policy
+fields, every model policy is validated and semantically cross-checked, and
+every onchain transaction still requires explicit wallet review and signature.

@@ -48,7 +48,7 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 3B: live wallet planner acceptance matrix
 - [x] Phase 4A: strict natural-language policy compiler and planner constraints
 - [x] Phase 4B: isolated Groq/xAI/OpenAI policy adapters with safe fallback
-- [ ] Phase 4C: live wallet preference-switch acceptance matrix
+- [x] Phase 4C: live wallet preference-switch acceptance matrix
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
@@ -68,7 +68,7 @@ Phase 4 compiles payer language into a versioned, strictly validated policy.
 Only documented policy fields reach the planner; executable configuration and
 transaction construction remain outside the AI boundary. See
 [docs/PHASE_4_REPORT.md](docs/PHASE_4_REPORT.md) for the schema, threat boundary,
-fallback behavior, and remaining wallet acceptance gate.
+fallback behavior, authenticated Groq evidence, and completed wallet gate.
 
 ## Local development
 
