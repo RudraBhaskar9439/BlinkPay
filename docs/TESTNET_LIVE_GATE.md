@@ -141,7 +141,7 @@ Both commands must pass before the wallet test.
 3. Open the payment link in the payer wallet.
 4. Test direct payment only if the payer has Circle testnet USDC.
 5. For the WMON route, request a fresh quote, approve only the displayed cap,
-   and pay before its 30-second deadline.
+   and pay before its three-minute deadline.
 6. Confirm on the explorer that the merchant USDC balance increased by exactly
    `100000` units, the invoice is marked paid, and the router retains no WMON or
    USDC.
@@ -149,3 +149,29 @@ Both commands must pass before the wallet test.
 
 The phase exits only after these observations come from live testnet
 transactions. A local green test is necessary but is not the live gate.
+
+## Live wallet-to-wallet result
+
+The complete gate passed on July 15, 2026 with the configured merchant and
+payer wallets.
+
+| Route | Transaction | Result |
+| --- | --- | --- |
+| Direct USDC | `0x6eb45b5e0c76bf852dc0cef44b94d63a59f89a638b9d0d847d5349651cc94b44` | Merchant received exactly `100000` USDC units |
+| Exact-output WMON | `0xaa4ecc49fa5cc6c3e334eb97cd4e3e989d8d93484ac1606b6dbaf5b0d78d2107` | Merchant received exactly `100000` USDC units |
+
+The swap receipt recorded:
+
+- maximum authorized WMON: `1018206133552172`
+- actual WMON spent: `1013140431395196`
+- WMON refunded atomically: `5065702156976`
+- merchant cumulative test balance after both routes: `200000` USDC units
+- router residual balances: `0 WMON` and `0 USDC`
+- pool balances after the swap: `101013140431395196 WMON` and `9900000 USDC`
+- paid flag for invoice
+  `0xafba108c7cc3cd2bc8b47c1888ff4d042646d9117e915cb4b9c7d3649f77d465`:
+  `true`
+
+A read-only replay of the exact swap calldata reverted with
+`InvoiceAlreadyPaid(bytes32)` and the same invoice ID. The live Phase 1 and
+Phase 2 testnet gates are complete.

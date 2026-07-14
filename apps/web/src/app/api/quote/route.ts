@@ -31,6 +31,8 @@ type QuoteRequestBody = {
   payer?: unknown;
 };
 
+const TESTNET_QUOTE_TTL_SECONDS = 180n;
+
 export async function POST(request: Request) {
   try {
     const body = await readBody(request);
@@ -183,7 +185,7 @@ async function createTestnetQuote(
 
   const maxSellAmount = quotedSellAmount * 10_050n / 10_000n + 1n;
   const now = BigInt(Math.floor(Date.now() / 1_000));
-  const quoteExpiry = now + 30n;
+  const quoteExpiry = now + TESTNET_QUOTE_TTL_SECONDS;
   const expiresAt = quoteExpiry < invoiceExpiry ? quoteExpiry : invoiceExpiry;
   const swapCallData = encodeFunctionData({
     abi: blinkPayTestnetPoolAbi,

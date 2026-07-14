@@ -39,15 +39,19 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 0A: repository and implementation plan
 - [x] Phase 0B: application and contract toolchains
 - [x] Phase 1A: signed invoice and direct USDC implementation
-- [ ] Phase 1B: live Monad testnet deployment and two-wallet smoke test
+- [x] Phase 1B: live Monad testnet deployment and two-wallet smoke test
 - [x] Phase 2A: exact-output WMON-to-USDC implementation
 - [x] Phase 2B: testnet pool and exact-output router integration
 - [x] Phase 2C: deploy and fund verified testnet liquidity
-- [ ] Phase 2D: complete direct and WMON wallet-to-wallet payments
+- [x] Phase 2D: complete direct and WMON wallet-to-wallet payments
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
 limitations.
+
+The live testnet gate passed on July 15, 2026: separate merchant and payer
+wallets settled one direct USDC invoice and one exact-output WMON invoice, with
+onchain balance, event, refund, zero-custody, and replay checks.
 
 ## Local development
 
