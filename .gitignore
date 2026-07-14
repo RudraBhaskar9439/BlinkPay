@@ -6,6 +6,8 @@ dist/
 coverage/
 cache/
 broadcast/
+.turbo/
+*.tsbuildinfo
 
 # Foundry
 packages/contracts/out/
@@ -13,9 +15,8 @@ packages/contracts/cache/
 packages/contracts/broadcast/
 
 # Environment and secrets
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 *.pem
 *.key
 

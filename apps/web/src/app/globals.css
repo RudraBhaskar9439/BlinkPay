@@ -1,0 +1,282 @@
+:root {
+  --ink: #171511;
+  --muted: #625f56;
+  --paper: #f4f0e6;
+  --paper-deep: #e8e0cf;
+  --acid: #c8ff53;
+  --violet: #7567ff;
+  --line: rgba(23, 21, 17, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 80% 0%, rgba(117, 103, 255, 0.18), transparent 34rem),
+    var(--paper);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+main {
+  width: min(1180px, calc(100% - 40px));
+  min-height: 100vh;
+  margin: 0 auto;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  letter-spacing: -0.03em;
+}
+
+.brandMark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px 10px 2px 10px;
+  background: var(--ink);
+  color: var(--acid);
+}
+
+.buildTag,
+.eyebrow,
+.cardLabel,
+.sectionNumber {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.buildTag {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.hero {
+  padding: 92px 0 76px;
+}
+
+.eyebrow {
+  display: inline-block;
+  padding: 8px 10px;
+  background: var(--acid);
+  transform: rotate(-1deg);
+}
+
+h1 {
+  max-width: 980px;
+  margin: 28px 0 20px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(62px, 9vw, 128px);
+  font-weight: 500;
+  line-height: 0.87;
+  letter-spacing: -0.075em;
+}
+
+h1 span {
+  color: var(--violet);
+}
+
+.lede {
+  max-width: 690px;
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(19px, 2.3vw, 26px);
+  line-height: 1.45;
+  letter-spacing: -0.025em;
+}
+
+.foundationCard {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-top: 64px;
+  padding: 26px;
+  border: 1px solid var(--ink);
+  border-radius: 2px 24px 24px 24px;
+  background: rgba(255, 255, 255, 0.38);
+  box-shadow: 8px 8px 0 var(--ink);
+}
+
+.cardLabel {
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+
+.foundationCard h2,
+.roadmap h2 {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 42px);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+}
+
+.networkStatus {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+button.networkStatus {
+  cursor: pointer;
+}
+
+.networkStatus small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.statusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #9c978b;
+}
+
+.online .statusDot {
+  background: #16a34a;
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.13);
+}
+
+.offline .statusDot {
+  background: #dc493a;
+}
+
+.checking .statusDot {
+  animation: pulse 1s infinite alternate;
+}
+
+.roadmap {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 80px;
+  padding: 76px 0;
+  border-top: 1px solid var(--line);
+}
+
+.sectionNumber {
+  margin: 0 0 18px;
+  color: var(--violet);
+}
+
+.roadmap ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.roadmap li {
+  display: grid;
+  grid-template-columns: 50px 1fr;
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.roadmap li:first-child {
+  border-top: 1px solid var(--line);
+}
+
+.roadmap li span {
+  color: var(--muted);
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.roadmap li p {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 28px 0 40px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.3;
+  }
+}
+
+@media (max-width: 760px) {
+  main {
+    width: min(100% - 28px, 1180px);
+  }
+
+  .hero {
+    padding: 64px 0 54px;
+  }
+
+  h1 {
+    font-size: clamp(56px, 17vw, 88px);
+  }
+
+  .foundationCard,
+  footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .networkStatus {
+    white-space: normal;
+  }
+
+  .roadmap {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    padding: 54px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+  }
+}
