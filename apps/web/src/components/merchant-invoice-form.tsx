@@ -7,10 +7,16 @@ import {
   type Invoice,
 } from "@blinkpay/core";
 import { activeMonadChain, activeUsdcAddress } from "@blinkpay/chain";
-import { connectInjectedWallet, formatAddress, getConfiguredRouterAddress, getErrorMessage } from "@/lib/wallet";
+import {
+  connectInjectedWallet,
+  formatAddress,
+  getConfiguredRouterAddress,
+  getErrorMessage,
+  watchInjectedAccount,
+} from "@/lib/wallet";
 import Image from "next/image";
 import QRCode from "qrcode";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { bytesToHex, parseUnits, type Address } from "viem";
 
 type GeneratedInvoice = {
@@ -27,6 +33,14 @@ export function MerchantInvoiceForm() {
   const [generated, setGenerated] = useState<GeneratedInvoice>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Connect the merchant wallet to sign an invoice.");
+
+  useEffect(() => watchInjectedAccount((nextAccount) => {
+    setAccount(nextAccount);
+    setGenerated(undefined);
+    setMessage(nextAccount
+      ? `MetaMask account changed to ${formatAddress(nextAccount)}. Create a new invoice.`
+      : "MetaMask disconnected. Connect the merchant wallet to continue.");
+  }), []);
 
   async function connect() {
     setBusy(true);

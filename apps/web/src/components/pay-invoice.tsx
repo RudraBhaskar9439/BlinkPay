@@ -17,8 +17,9 @@ import {
   formatAddress,
   getConfiguredRouterAddress,
   getErrorMessage,
+  watchInjectedAccount,
 } from "@/lib/wallet";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   erc20Abi,
   formatUnits,
@@ -59,6 +60,15 @@ export function PayInvoice({ payload }: { payload?: string }) {
   const [swapQuote, setSwapQuote] = useState<SwapQuote>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Review every field before connecting your wallet.");
+
+  useEffect(() => watchInjectedAccount((nextAccount) => {
+    setAccount(nextAccount);
+    setSwapQuote(undefined);
+    setTransactionHash(undefined);
+    setMessage(nextAccount
+      ? `MetaMask account changed to ${formatAddress(nextAccount)}. Ready to preflight.`
+      : "MetaMask disconnected. Connect the payer wallet to continue.");
+  }), []);
 
   if (!parsed.ok) {
     return (

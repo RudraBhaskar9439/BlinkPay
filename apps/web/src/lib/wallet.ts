@@ -12,7 +12,12 @@ import {
   type EIP1193Provider,
 } from "viem";
 
-type BrowserWithEthereum = Window & { ethereum?: EIP1193Provider };
+type AccountListener = (account: Address | undefined) => void;
+type InjectedProvider = EIP1193Provider & {
+  on?: (event: "accountsChanged", listener: (accounts: unknown) => void) => void;
+  removeListener?: (event: "accountsChanged", listener: (accounts: unknown) => void) => void;
+};
+type BrowserWithEthereum = Window & { ethereum?: InjectedProvider };
 
 export function getConfiguredRouterAddress(): Address {
   const value = process.env.NEXT_PUBLIC_BLINKPAY_ROUTER_ADDRESS
@@ -41,11 +46,11 @@ export async function connectInjectedWallet() {
   await ensureMonad(provider);
 
   const accounts = await provider.request({ method: "eth_requestAccounts" });
-  if (!Array.isArray(accounts) || typeof accounts[0] !== "string" || !isAddress(accounts[0])) {
+  const account = getPrimaryAccount(accounts);
+  if (!account) {
     throw new Error("Wallet did not return a valid account");
   }
 
-  const account = getAddress(accounts[0]);
   const walletClient = createWalletClient({
     account,
     chain: activeMonadChain,
@@ -55,7 +60,40 @@ export async function connectInjectedWallet() {
   return { account, walletClient };
 }
 
-function getInjectedProvider(): EIP1193Provider {
+/// Keeps UI state synchronized with MetaMask account switches and disconnects.
+export function watchInjectedAccount(listener: AccountListener): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  const provider = (window as BrowserWithEthereum).ethereum;
+  if (!provider) return () => undefined;
+
+  let active = true;
+  let accountEventReceived = false;
+  const handleAccountsChanged = (accounts: unknown) => {
+    accountEventReceived = true;
+    if (active) listener(getPrimaryAccount(accounts));
+  };
+
+  provider.on?.("accountsChanged", handleAccountsChanged);
+  void provider.request({ method: "eth_accounts" })
+    .then((accounts) => {
+      if (active && !accountEventReceived) listener(getPrimaryAccount(accounts));
+    })
+    .catch(() => undefined);
+
+  return () => {
+    active = false;
+    provider.removeListener?.("accountsChanged", handleAccountsChanged);
+  };
+}
+
+function getPrimaryAccount(accounts: unknown): Address | undefined {
+  if (!Array.isArray(accounts) || typeof accounts[0] !== "string" || !isAddress(accounts[0])) {
+    return undefined;
+  }
+  return getAddress(accounts[0]);
+}
+
+function getInjectedProvider(): InjectedProvider {
   if (typeof window === "undefined") throw new Error("Wallet access requires a browser");
   const provider = (window as BrowserWithEthereum).ethereum;
   if (!provider) throw new Error("No injected wallet found. Install MetaMask or another EVM wallet.");
