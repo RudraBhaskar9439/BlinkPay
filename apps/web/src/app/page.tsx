@@ -17,7 +17,10 @@ export default function Home() {
           <span className="brandMark" aria-hidden="true">B</span>
           <span>BlinkPay</span>
         </a>
-        <span className="buildTag">Built on Monad</span>
+        <div className="navActions">
+          <a href="/merchant">Create invoice</a>
+          <span className="buildTag">Built on Monad</span>
+        </div>
       </nav>
 
       <section className="hero" id="top">
@@ -31,6 +34,11 @@ export default function Home() {
           invoice from idle tokens and supported DeFi positions—under rules you
           control.
         </p>
+
+        <div className="heroActions">
+          <a className="primaryButton buttonLink" href="/merchant">Create a signed invoice</a>
+          <span>No custody. No server-side invoice database.</span>
+        </div>
 
         <div className="foundationCard">
           <div>
