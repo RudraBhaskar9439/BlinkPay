@@ -251,7 +251,10 @@ settle the invoice atomically.
 
 ### Implement
 
-- manually verified allowlist containing one liquid Euler/Euler Earn vault
+- immutable allowlist containing one verified vault; the hackathon testnet gate
+  uses an explicitly labelled BlinkPay ERC-4626 fixture because Euler's
+  official labels contain Monad mainnet (`143`) but no Monad testnet (`10143`)
+  vault list
 - vault share balance, `asset`, `previewWithdraw`, `maxWithdraw`, and liquidity
   reads
 - share approval/authorization flow

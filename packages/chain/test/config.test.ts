@@ -43,6 +43,7 @@ describe("Monad configuration", () => {
   it("tracks the verified BlinkPay testnet deployment", () => {
     expect(getAddress(blinkPayTestnetDeployment.pool)).toBe(blinkPayTestnetDeployment.pool);
     expect(getAddress(blinkPayTestnetDeployment.router)).toBe(blinkPayTestnetDeployment.router);
+    expect(getAddress(blinkPayTestnetDeployment.vault)).toBe(blinkPayTestnetDeployment.vault);
   });
 
   it("uses HTTPS public RPC defaults", () => {

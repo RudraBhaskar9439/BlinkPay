@@ -49,6 +49,9 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 4A: strict natural-language policy compiler and planner constraints
 - [x] Phase 4B: isolated Groq/xAI/OpenAI policy adapters with safe fallback
 - [x] Phase 4C: live wallet preference-switch acceptance matrix
+- [x] Phase 5A: atomic ERC-4626 vault settlement and deterministic constraints
+- [x] Phase 5B: live Monad testnet vault/router deployment and funded payer position
+- [ ] Phase 5C: complete the final payer-signed vault payment acceptance
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
@@ -69,6 +72,13 @@ Only documented policy fields reach the planner; executable configuration and
 transaction construction remain outside the AI boundary. See
 [docs/PHASE_4_REPORT.md](docs/PHASE_4_REPORT.md) for the schema, threat boundary,
 fallback behavior, authenticated Groq evidence, and completed wallet gate.
+
+Phase 5 adds one immutable ERC-4626 route. The planner verifies the router's
+allowlisted vault, underlying USDC, share balance and allowance,
+`previewWithdraw`, `maxWithdraw`, and a payer maximum-share cap. The live
+testnet vault is a clearly labelled BlinkPay fixture—not an Euler deployment—
+because Euler's official labels currently contain Monad mainnet entries but no
+Monad testnet vault list. See [docs/PHASE_5_REPORT.md](docs/PHASE_5_REPORT.md).
 
 ## Local development
 
@@ -125,7 +135,8 @@ remains documented in [docs/PHASE_2_REPORT.md](docs/PHASE_2_REPORT.md).
 The verified testnet deployment is:
 
 - BlinkPay pool: `0x88a2208424bFB2D3fc4F299e92993FFe5fAFedb3`
-- BlinkPay router: `0x23f655e41F135d9b2FEfD7173342A8c30DF01e2f`
+- BlinkPay three-route router: `0x029a2AE62021A11E1b2F13a386F89762eC15C915`
+- BlinkPay testnet ERC-4626 vault: `0xbb171586DE327A2c9BB2ea3A7D200B9A92fbeb89`
 
 These addresses are kept in version-controlled chain configuration and checked
 against their immutable onchain settings before the quote service uses them.
