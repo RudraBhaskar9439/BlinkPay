@@ -167,36 +167,53 @@ function buildSwapPlan(input: PlannerInput): PaymentPlan {
   const quote = input.swap.quote;
   const maximumSpend = quote?.maxSellAmount ?? 0n;
   const approvalRequired = quote !== undefined && input.swap.allowance < maximumSpend;
+  const terminalReason = input.invoiceAlreadyPaid
+    ? "Skipped because the router reports this invoice paid"
+    : input.invoiceExpiry < input.now
+      ? "Skipped because the invoice has expired"
+      : undefined;
   const constraints = commonConstraints(input);
   constraints.push({
     id: "quote-available",
     label: "Executable exact-output quote is available",
-    status: quote ? "pass" : "fail",
-    evidence: quote ? "Pool returned executable calldata" : (input.swap.quoteError ?? "No quote"),
+    status: terminalReason ? "pending" : quote ? "pass" : "fail",
+    evidence: terminalReason
+      ?? (quote ? "Pool returned executable calldata" : (input.swap.quoteError ?? "No quote")),
   });
   constraints.push({
     id: "quote-fresh",
     label: "Quote remains executable",
-    status: quote ? (quote.expiresAt > input.now ? "pass" : "fail") : "fail",
-    evidence: quote ? `expires ${quote.expiresAt}; observed ${input.now}` : "No quote expiry",
+    status: terminalReason || !quote
+      ? "pending"
+      : quote.expiresAt > input.now ? "pass" : "fail",
+    evidence: terminalReason
+      ?? (quote ? `expires ${quote.expiresAt}; observed ${input.now}` : "Pending executable quote"),
   });
   constraints.push({
     id: "balance-sufficient",
     label: "WMON balance covers the maximum",
-    status: quote && input.swap.balance >= maximumSpend ? "pass" : "fail",
-    evidence: `${input.swap.balance} available; ${maximumSpend} maximum`,
+    status: terminalReason || !quote
+      ? "pending"
+      : input.swap.balance >= maximumSpend ? "pass" : "fail",
+    evidence: terminalReason
+      ?? (quote
+        ? `${input.swap.balance} available; ${maximumSpend} maximum`
+        : "Pending executable quote"),
   });
 
   const configuredMaximum = input.preferences?.maxWmonSpend;
   constraints.push({
     id: "maximum-spend",
     label: "Quote respects the WMON spending cap",
-    status: quote && (configuredMaximum === undefined || maximumSpend <= configuredMaximum)
-      ? "pass"
-      : "fail",
-    evidence: configuredMaximum === undefined
-      ? "No additional WMON cap configured"
-      : `${maximumSpend} quoted; ${configuredMaximum} allowed`,
+    status: terminalReason || !quote
+      ? "pending"
+      : configuredMaximum === undefined || maximumSpend <= configuredMaximum ? "pass" : "fail",
+    evidence: terminalReason
+      ?? (!quote
+        ? "Pending executable quote"
+        : configuredMaximum === undefined
+          ? "No additional WMON cap configured"
+          : `${maximumSpend} quoted; ${configuredMaximum} allowed`),
   });
   constraints.push(simulationConstraint(input.swap.simulation));
 

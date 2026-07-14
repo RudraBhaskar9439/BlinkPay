@@ -568,11 +568,11 @@ export function PayInvoice({ payload }: { payload?: string }) {
 
                     <dl className="planMetrics">
                       <div><dt>Balance</dt><dd>{formatPlanUnits(plan, plan.balance)}</dd></div>
-                      <div><dt>Maximum</dt><dd>{formatPlanUnits(plan, plan.maximumSpend)}</dd></div>
-                      <div><dt>Approval</dt><dd>{plan.approvalRequired ? "Required" : "Already sufficient"}</dd></div>
+                      <div><dt>Maximum</dt><dd>{formatPlanMaximum(plan)}</dd></div>
+                      <div><dt>Approval</dt><dd>{formatApprovalStatus(plan)}</dd></div>
                       <div><dt>Estimated gas</dt><dd>{plan.cost.estimatedGasUnits.toString()}</dd></div>
-                      <div><dt>Swap cost</dt><dd>{plan.cost.swapCostBps} bps</dd></div>
-                      <div><dt>Score</dt><dd>{plan.cost.deterministicScore}</dd></div>
+                      <div><dt>Swap cost</dt><dd>{formatSwapCost(plan)}</dd></div>
+                      <div><dt>Score</dt><dd>{plan.status === "eligible" ? plan.cost.deterministicScore : "Not ranked"}</dd></div>
                     </dl>
 
                     {plan.rejectionReasons.length ? (
@@ -778,6 +778,23 @@ async function simulateSwapCandidate(input: {
 function formatPlanUnits(plan: PaymentPlan, amount: bigint): string {
   const decimals = plan.fundingAsset === "USDC" ? 6 : 18;
   return `${formatUnits(amount, decimals)} ${plan.fundingAsset}`;
+}
+
+function formatPlanMaximum(plan: PaymentPlan): string {
+  return hasExecutableQuote(plan) ? formatPlanUnits(plan, plan.maximumSpend) : "Not quoted";
+}
+
+function formatApprovalStatus(plan: PaymentPlan): string {
+  if (!hasExecutableQuote(plan)) return "Not applicable";
+  return plan.approvalRequired ? "Required" : "Already sufficient";
+}
+
+function formatSwapCost(plan: PaymentPlan): string {
+  return hasExecutableQuote(plan) ? `${plan.cost.swapCostBps} bps` : "Not quoted";
+}
+
+function hasExecutableQuote(plan: PaymentPlan): boolean {
+  return plan.kind !== "exact-output-swap" || plan.quoteExpiresAt !== undefined;
 }
 
 function parseSwapQuote(value: unknown): SwapQuote {

@@ -95,6 +95,9 @@ describe("deterministic payment planner", () => {
     const swap = result.plans.find((plan) => plan.id === "swap-wmon");
     expect(swap?.status).toBe("unavailable");
     expect(swap?.rejectionReasons.join(" ")).toContain("Pool RPC unavailable");
+    expect(swap?.rejectionReasons).toHaveLength(1);
+    expect(swap?.constraints.filter((constraint) => constraint.status === "pending"))
+      .toHaveLength(4);
     expect(result.recommendedPlanId).toBe("direct-usdc");
   });
 
@@ -110,5 +113,7 @@ describe("deterministic payment planner", () => {
     const result = buildPaymentPlans(input({ invoiceAlreadyPaid: true }));
     expect(result.recommendedPlanId).toBeUndefined();
     expect(result.plans.every((plan) => plan.status === "unavailable")).toBe(true);
+    expect(result.plans.find((plan) => plan.id === "swap-wmon")?.rejectionReasons)
+      .toEqual(["Invoice has not been paid: Router reports paid"]);
   });
 });
