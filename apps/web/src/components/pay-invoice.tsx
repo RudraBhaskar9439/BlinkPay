@@ -10,8 +10,16 @@ import {
   blinkPayRouterAbi,
   buildInvoiceTypedData,
   decodeSignedInvoice,
+  type Invoice,
   type SignedInvoice,
 } from "@blinkpay/core";
+import {
+  buildPaymentPlans,
+  type PaymentPlan,
+  type PlannerResult,
+  type PortfolioSnapshot,
+  type SimulationResult,
+} from "@blinkpay/planner";
 import {
   connectInjectedWallet,
   formatAddress,
@@ -40,9 +48,12 @@ type SwapQuote = {
   buyAmount: bigint;
   maxSellAmount: bigint;
   estimatedSellAmount?: bigint;
+  swapCostBps?: number;
   swapCallData: Hex;
   expiresAt: bigint;
 };
+
+type RouteAnalysis = PlannerResult & { portfolio: PortfolioSnapshot };
 
 function parsePayload(payload: string | undefined): ParsedPayload {
   if (!payload) return { ok: false, error: "This payment link does not contain an invoice." };
@@ -58,12 +69,14 @@ export function PayInvoice({ payload }: { payload?: string }) {
   const [account, setAccount] = useState<Address>();
   const [transactionHash, setTransactionHash] = useState<Hex>();
   const [swapQuote, setSwapQuote] = useState<SwapQuote>();
+  const [routeAnalysis, setRouteAnalysis] = useState<RouteAnalysis>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Review every field before connecting your wallet.");
 
   useEffect(() => watchInjectedAccount((nextAccount) => {
     setAccount(nextAccount);
     setSwapQuote(undefined);
+    setRouteAnalysis(undefined);
     setTransactionHash(undefined);
     setMessage(nextAccount
       ? `MetaMask account changed to ${formatAddress(nextAccount)}. Ready to preflight.`
@@ -96,6 +109,144 @@ export function PayInvoice({ payload }: { payload?: string }) {
       const wallet = await connectInjectedWallet();
       setAccount(wallet.account);
       setMessage(`Connected as ${formatAddress(wallet.account)}. Ready to preflight.`);
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function analyzeRoutes() {
+    setBusy(true);
+    setRouteAnalysis(undefined);
+    setTransactionHash(undefined);
+
+    try {
+      const routerAddress = getConfiguredRouterAddress();
+      if (invoice.chainId !== BigInt(activeMonadChain.id)) {
+        throw new Error("Invoice is for a different chain");
+      }
+      const signatureValid = await verifyTypedData({
+        address: invoice.merchant,
+        signature,
+        ...buildInvoiceTypedData(invoice, routerAddress),
+      });
+      if (!signatureValid) throw new Error("Merchant signature is invalid for this router");
+
+      const wallet = await connectInjectedWallet();
+      const client = createMonadPublicClient(activeMonadNetwork);
+      setAccount(wallet.account);
+      setMessage("Reading live balances, allowances, replay state, and quotes…");
+
+      const [invoiceAlreadyPaid, nativeBalance, usdcBalance, usdcAllowance, wmonBalance,
+        wmonAllowance] = await Promise.all([
+        client.readContract({
+          address: routerAddress,
+          abi: blinkPayRouterAbi,
+          functionName: "paidInvoices",
+          args: [invoice.invoiceId],
+        }),
+        client.getBalance({ address: wallet.account }),
+        client.readContract({
+          address: invoice.settlementToken,
+          abi: erc20Abi,
+          functionName: "balanceOf",
+          args: [wallet.account],
+        }),
+        client.readContract({
+          address: invoice.settlementToken,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [wallet.account, routerAddress],
+        }),
+        client.readContract({
+          address: activeWmonAddress,
+          abi: erc20Abi,
+          functionName: "balanceOf",
+          args: [wallet.account],
+        }),
+        client.readContract({
+          address: activeWmonAddress,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [wallet.account, routerAddress],
+        }),
+      ]);
+
+      const now = getCurrentUnixTime();
+      let quote: SwapQuote | undefined;
+      let quoteError: string | undefined;
+      if (!invoiceAlreadyPaid && invoice.expiry >= now) {
+        try {
+          quote = await fetchSwapQuote(payload, wallet.account);
+          validateSwapQuote(quote, invoice);
+        } catch (error) {
+          quoteError = getErrorMessage(error);
+        }
+      } else {
+        quoteError = invoiceAlreadyPaid ? "Invoice is already paid" : "Invoice has expired";
+      }
+
+      const directSimulation = await simulateDirectCandidate({
+        client,
+        routerAddress,
+        account: wallet.account,
+        signedInvoice,
+        invoiceAlreadyPaid,
+        now,
+        balance: usdcBalance,
+        allowance: usdcAllowance,
+      });
+      const swapSimulation = await simulateSwapCandidate({
+        client,
+        routerAddress,
+        account: wallet.account,
+        signedInvoice,
+        invoiceAlreadyPaid,
+        now,
+        balance: wmonBalance,
+        allowance: wmonAllowance,
+        quote,
+      });
+
+      const portfolio: PortfolioSnapshot = {
+        account: wallet.account,
+        observedAt: now,
+        nativeBalance,
+        usdc: { balance: usdcBalance, allowance: usdcAllowance },
+        wmon: { balance: wmonBalance, allowance: wmonAllowance },
+      };
+      const result = buildPaymentPlans({
+        now,
+        invoiceAmount: invoice.amount,
+        invoiceExpiry: invoice.expiry,
+        invoiceAlreadyPaid,
+        direct: {
+          balance: usdcBalance,
+          allowance: usdcAllowance,
+          simulation: directSimulation,
+        },
+        swap: {
+          balance: wmonBalance,
+          allowance: wmonAllowance,
+          ...(quote ? {
+            quote: {
+              estimatedSellAmount: quote.estimatedSellAmount ?? quote.maxSellAmount,
+              maxSellAmount: quote.maxSellAmount,
+              expiresAt: quote.expiresAt,
+              ...(quote.swapCostBps === undefined ? {} : { swapCostBps: quote.swapCostBps }),
+            },
+          } : { quoteError: quoteError ?? "Unable to obtain a quote" }),
+          simulation: swapSimulation,
+        },
+      });
+
+      setSwapQuote(quote);
+      setRouteAnalysis({ ...result, portfolio });
+      const recommended = result.plans.find((plan) => plan.id === result.recommendedPlanId);
+      setMessage(recommended
+        ? `${recommended.fundingAsset} is recommended by the displayed deterministic score.`
+        : "No route currently satisfies every constraint. Review the rejection evidence.");
     } catch (error) {
       setMessage(getErrorMessage(error));
     } finally {
@@ -160,7 +311,16 @@ export function PayInvoice({ payload }: { payload?: string }) {
         await client.waitForTransactionReceipt({ hash: approvalHash });
       }
 
-      setMessage("Approval confirmed. Settle the invoice in your wallet…");
+      setMessage("Approval confirmed. Simulating the exact settlement onchain…");
+      await client.estimateContractGas({
+        address: routerAddress,
+        abi: blinkPayRouterAbi,
+        functionName: "payDirect",
+        args: [invoice, signature],
+        account: wallet.account,
+      });
+
+      setMessage("Preflight passed. Settle the invoice in your wallet…");
       const paymentHash = await wallet.walletClient.writeContract({
         address: routerAddress,
         abi: blinkPayRouterAbi,
@@ -203,20 +363,8 @@ export function PayInvoice({ payload }: { payload?: string }) {
       setAccount(wallet.account);
       setMessage("Reading a server-validated exact-output quote from the testnet pool…");
 
-      const response = await fetch("/api/quote", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ invoicePayload: payload, payer: wallet.account }),
-      });
-      const value: unknown = await response.json();
-      if (!response.ok) throw new Error(readQuoteError(value));
-
-      const quote = parseSwapQuote(value);
-      if (quote.sellToken !== getAddress(activeWmonAddress)) {
-        throw new Error("Quote sell token is not canonical WMON");
-      }
-      if (quote.buyAmount !== invoice.amount) throw new Error("Quote changed the invoice amount");
-      if (quote.expiresAt > invoice.expiry) throw new Error("Quote outlives the signed invoice");
+      const quote = await fetchSwapQuote(payload, wallet.account);
+      validateSwapQuote(quote, invoice);
 
       setSwapQuote(quote);
       const maximum = formatUnits(quote.maxSellAmount, 18);
@@ -302,7 +450,22 @@ export function PayInvoice({ payload }: { payload?: string }) {
         throw new Error("The quote expired after approval. Request a fresh quote; your cap remains safe");
       }
 
-      setMessage("Approval confirmed. Execute the exact-output route in your wallet…");
+      setMessage("Approval confirmed. Simulating the exact-output route onchain…");
+      await client.estimateContractGas({
+        address: routerAddress,
+        abi: blinkPayRouterAbi,
+        functionName: "payWithSwap",
+        args: [
+          invoice,
+          signature,
+          swapQuote.maxSellAmount,
+          swapQuote.expiresAt,
+          swapQuote.swapCallData,
+        ],
+        account: wallet.account,
+      });
+
+      setMessage("Preflight passed. Execute the exact-output route in your wallet…");
       const paymentHash = await wallet.walletClient.writeContract({
         address: routerAddress,
         abi: blinkPayRouterAbi,
@@ -366,8 +529,91 @@ export function PayInvoice({ payload }: { payload?: string }) {
           ) : <code>{formatAddress(account)}</code>}
         </div>
 
+        <section className="routePlanner" aria-labelledby="route-planner-title">
+          <div className="routePlannerHeader">
+            <div>
+              <p className="cardLabel">Phase 3 · Deterministic planner</p>
+              <h2 id="route-planner-title">Compare live payment evidence.</h2>
+            </div>
+            <button className="secondaryButton" type="button" onClick={analyzeRoutes} disabled={busy}>
+              {busy ? "Analyzing…" : "Analyze wallet routes"}
+            </button>
+          </div>
+
+          {routeAnalysis ? (
+            <>
+              <div className="portfolioEvidence" aria-label="Live wallet portfolio">
+                <div><span>MON</span><strong>{formatUnits(routeAnalysis.portfolio.nativeBalance, 18)}</strong></div>
+                <div><span>USDC</span><strong>{formatUnits(routeAnalysis.portfolio.usdc.balance, 6)}</strong></div>
+                <div><span>WMON</span><strong>{formatUnits(routeAnalysis.portfolio.wmon.balance, 18)}</strong></div>
+              </div>
+
+              <div className="planEvidenceGrid">
+                {routeAnalysis.plans.map((plan) => (
+                  <article
+                    className={`planEvidenceCard ${plan.id === routeAnalysis.recommendedPlanId ? "recommendedPlan" : ""}`}
+                    key={plan.id}
+                  >
+                    <div className="planEvidenceTitle">
+                      <div>
+                        <span>{plan.status === "eligible" ? "Eligible" : "Unavailable"}</span>
+                        <h3>{plan.fundingAsset} · {plan.kind === "direct" ? "Direct" : "Exact output"}</h3>
+                      </div>
+                      {plan.rank ? <strong>#{plan.rank}</strong> : null}
+                    </div>
+
+                    <dl className="planMetrics">
+                      <div><dt>Balance</dt><dd>{formatPlanUnits(plan, plan.balance)}</dd></div>
+                      <div><dt>Maximum</dt><dd>{formatPlanUnits(plan, plan.maximumSpend)}</dd></div>
+                      <div><dt>Approval</dt><dd>{plan.approvalRequired ? "Required" : "Already sufficient"}</dd></div>
+                      <div><dt>Estimated gas</dt><dd>{plan.cost.estimatedGasUnits.toString()}</dd></div>
+                      <div><dt>Swap cost</dt><dd>{plan.cost.swapCostBps} bps</dd></div>
+                      <div><dt>Score</dt><dd>{plan.cost.deterministicScore}</dd></div>
+                    </dl>
+
+                    {plan.rejectionReasons.length ? (
+                      <ul className="rejectionList">
+                        {plan.rejectionReasons.map((reason) => <li key={reason}>{reason}</li>)}
+                      </ul>
+                    ) : (
+                      <p className="eligibleReason">
+                        All hard constraints pass. Pending approval is performed before simulation.
+                      </p>
+                    )}
+
+                    <details className="constraintEvidence">
+                      <summary>Show raw constraint evidence</summary>
+                      <ul>
+                        {plan.constraints.map((constraint) => (
+                          <li key={constraint.id}>
+                            <strong>{constraint.status.toUpperCase()}</strong>
+                            <span>{constraint.label}</span>
+                            <small>{constraint.evidence}</small>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </article>
+                ))}
+              </div>
+              <p className="plannerFormula">
+                Score = gas ÷ 10,000 + approval penalty + swap-cost bps + preference penalty.
+                Lowest eligible score wins; ties use route ID.
+              </p>
+            </>
+          ) : (
+            <p className="plannerEmpty">
+              Connect the payer and analyze to read live balances, allowances, quote state, and replay status.
+            </p>
+          )}
+        </section>
+
         <div className="routeGrid" aria-label="Payment routes">
-          <article className="routeCard">
+          <article
+            className={`routeCard ${
+              routeAnalysis?.recommendedPlanId === "direct-usdc" ? "featuredRoute" : ""
+            }`}
+          >
             <p className="cardLabel">Route 01 · Direct</p>
             <h2>Pay from USDC</h2>
             <p>Spend exactly the invoice amount from your existing USDC balance.</p>
@@ -376,7 +622,11 @@ export function PayInvoice({ payload }: { payload?: string }) {
             </button>
           </article>
 
-          <article className="routeCard featuredRoute">
+          <article
+            className={`routeCard ${
+              routeAnalysis?.recommendedPlanId === "swap-wmon" ? "featuredRoute" : ""
+            }`}
+          >
             <p className="cardLabel">Route 02 · Exact buy</p>
             <h2>Pay from WMON</h2>
             <p>The testnet pool delivers exactly {displayAmount} USDC. Unspent WMON returns atomically.</p>
@@ -418,6 +668,104 @@ export function PayInvoice({ payload }: { payload?: string }) {
   );
 }
 
+type MonadPublicClient = ReturnType<typeof createMonadPublicClient>;
+
+async function fetchSwapQuote(payload: string | undefined, payer: Address): Promise<SwapQuote> {
+  if (!payload) throw new Error("Invoice payload is unavailable");
+  const response = await fetch("/api/quote", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ invoicePayload: payload, payer }),
+  });
+  const value: unknown = await response.json();
+  if (!response.ok) throw new Error(readQuoteError(value));
+  return parseSwapQuote(value);
+}
+
+function validateSwapQuote(quote: SwapQuote, invoice: Invoice): void {
+  if (quote.sellToken !== getAddress(activeWmonAddress)) {
+    throw new Error("Quote sell token is not canonical WMON");
+  }
+  if (quote.buyAmount !== invoice.amount) throw new Error("Quote changed the invoice amount");
+  if (quote.expiresAt > invoice.expiry) throw new Error("Quote outlives the signed invoice");
+}
+
+async function simulateDirectCandidate(input: {
+  client: MonadPublicClient;
+  routerAddress: Address;
+  account: Address;
+  signedInvoice: SignedInvoice;
+  invoiceAlreadyPaid: boolean;
+  now: bigint;
+  balance: bigint;
+  allowance: bigint;
+}): Promise<SimulationResult> {
+  const { invoice, signature } = input.signedInvoice;
+  if (input.invoiceAlreadyPaid || invoice.expiry < input.now || input.balance < invoice.amount) {
+    return { status: "not-run" };
+  }
+  if (input.allowance < invoice.amount) return { status: "requires-approval" };
+
+  try {
+    const gasEstimate = await input.client.estimateContractGas({
+      address: input.routerAddress,
+      abi: blinkPayRouterAbi,
+      functionName: "payDirect",
+      args: [invoice, signature],
+      account: input.account,
+    });
+    return { status: "passed", gasEstimate };
+  } catch (error) {
+    return { status: "failed", reason: getErrorMessage(error) };
+  }
+}
+
+async function simulateSwapCandidate(input: {
+  client: MonadPublicClient;
+  routerAddress: Address;
+  account: Address;
+  signedInvoice: SignedInvoice;
+  invoiceAlreadyPaid: boolean;
+  now: bigint;
+  balance: bigint;
+  allowance: bigint;
+  quote?: SwapQuote;
+}): Promise<SimulationResult> {
+  const { invoice, signature } = input.signedInvoice;
+  const quote = input.quote;
+  if (
+    input.invoiceAlreadyPaid || invoice.expiry < input.now || !quote
+      || quote.expiresAt <= input.now || input.balance < quote.maxSellAmount
+  ) {
+    return { status: "not-run" };
+  }
+  if (input.allowance < quote.maxSellAmount) return { status: "requires-approval" };
+
+  try {
+    const gasEstimate = await input.client.estimateContractGas({
+      address: input.routerAddress,
+      abi: blinkPayRouterAbi,
+      functionName: "payWithSwap",
+      args: [
+        invoice,
+        signature,
+        quote.maxSellAmount,
+        quote.expiresAt,
+        quote.swapCallData,
+      ],
+      account: input.account,
+    });
+    return { status: "passed", gasEstimate };
+  } catch (error) {
+    return { status: "failed", reason: getErrorMessage(error) };
+  }
+}
+
+function formatPlanUnits(plan: PaymentPlan, amount: bigint): string {
+  const decimals = plan.fundingAsset === "USDC" ? 6 : 18;
+  return `${formatUnits(amount, decimals)} ${plan.fundingAsset}`;
+}
+
 function parseSwapQuote(value: unknown): SwapQuote {
   if (!isRecord(value)) throw new Error("Quote response has an invalid shape");
 
@@ -429,13 +777,17 @@ function parseSwapQuote(value: unknown): SwapQuote {
   const estimatedSellAmount = value.estimatedSellAmount === undefined
     ? undefined
     : requireQuoteBigInt(value.estimatedSellAmount, "estimatedSellAmount");
+  const swapCostBps = value.swapCostBps === undefined
+    ? undefined
+    : requireQuoteNonnegativeInteger(value.swapCostBps, "swapCostBps");
 
   return {
     sellToken,
     swapCallData,
     buyAmount,
     maxSellAmount,
-    estimatedSellAmount,
+    ...(estimatedSellAmount === undefined ? {} : { estimatedSellAmount }),
+    ...(swapCostBps === undefined ? {} : { swapCostBps }),
     expiresAt,
   };
 }
@@ -466,6 +818,13 @@ function requireQuoteBigInt(value: unknown, field: string): bigint {
   const parsed = BigInt(value);
   if (parsed <= 0n) throw new Error(`Quote ${field} must be positive`);
   return parsed;
+}
+
+function requireQuoteNonnegativeInteger(value: unknown, field: string): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`Quote ${field} is invalid`);
+  }
+  return value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

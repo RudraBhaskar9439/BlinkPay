@@ -6,7 +6,12 @@ import { resolve } from "node:path";
 config({ path: resolve(process.cwd(), "../../.env"), quiet: true });
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@blinkpay/chain", "@blinkpay/core", "@blinkpay/zerox"],
+  transpilePackages: [
+    "@blinkpay/chain",
+    "@blinkpay/core",
+    "@blinkpay/planner",
+    "@blinkpay/zerox",
+  ],
 };
 
 export default nextConfig;

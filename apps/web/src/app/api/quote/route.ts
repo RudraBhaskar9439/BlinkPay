@@ -18,6 +18,7 @@ import { requestExactBuyQuote } from "@blinkpay/zerox";
 import { NextResponse } from "next/server";
 import {
   encodeFunctionData,
+  erc20Abi,
   getAddress,
   isAddress,
   isHex,
@@ -138,6 +139,8 @@ async function createTestnetQuote(
     routerSwapTarget,
     routerAllowanceTarget,
     selectorAllowed,
+    poolSellReserve,
+    poolSettlementReserve,
   ] = await Promise.all([
     client.readContract({
       address: pool,
@@ -165,6 +168,18 @@ async function createTestnetQuote(
       functionName: "allowedSwapSelectors",
       args: [swapSelector],
     }),
+    client.readContract({
+      address: getAddress(activeWmonAddress),
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [pool],
+    }),
+    client.readContract({
+      address: getAddress(activeUsdcAddress),
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [pool],
+    }),
   ]);
 
   const canonicalWmon = getAddress(activeWmonAddress);
@@ -184,6 +199,12 @@ async function createTestnetQuote(
   if (!selectorAllowed) throw new ConfigurationError("Testnet pool swap selector is not allowlisted");
 
   const maxSellAmount = quotedSellAmount * 10_050n / 10_000n + 1n;
+  const spotSellAmount = poolSettlementReserve === 0n
+    ? 0n
+    : poolSellReserve * buyAmount / poolSettlementReserve;
+  const swapCostBps = spotSellAmount === 0n || quotedSellAmount <= spotSellAmount
+    ? 0
+    : Number((quotedSellAmount - spotSellAmount) * 10_000n / spotSellAmount);
   const now = BigInt(Math.floor(Date.now() / 1_000));
   const quoteExpiry = now + TESTNET_QUOTE_TTL_SECONDS;
   const expiresAt = quoteExpiry < invoiceExpiry ? quoteExpiry : invoiceExpiry;
@@ -200,6 +221,9 @@ async function createTestnetQuote(
     buyAmount: buyAmount.toString(),
     maxSellAmount: maxSellAmount.toString(),
     estimatedSellAmount: quotedSellAmount.toString(),
+    swapCostBps,
+    poolSellReserve: poolSellReserve.toString(),
+    poolSettlementReserve: poolSettlementReserve.toString(),
     allowanceTarget: pool,
     swapTarget: pool,
     swapCallData,

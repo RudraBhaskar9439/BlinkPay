@@ -571,6 +571,176 @@ code {
   padding: 4px 0 20px;
 }
 
+.routePlanner {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1px solid var(--ink);
+  border-radius: 16px;
+  background: rgba(200, 255, 83, 0.14);
+}
+
+.routePlannerHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.routePlannerHeader h2,
+.planEvidenceTitle h3,
+.routePlannerHeader p,
+.plannerEmpty,
+.plannerFormula,
+.eligibleReason {
+  margin: 0;
+}
+
+.routePlannerHeader h2 {
+  margin-top: 5px;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.portfolioEvidence {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.portfolioEvidence > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 11px;
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.portfolioEvidence span,
+.planMetrics dt {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.portfolioEvidence strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.planEvidenceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.planEvidenceCard {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.recommendedPlan {
+  border: 2px solid var(--violet);
+  box-shadow: 4px 4px 0 rgba(117, 103, 255, 0.34);
+}
+
+.planEvidenceTitle {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.planEvidenceTitle span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.planEvidenceTitle h3 {
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.planEvidenceTitle > strong {
+  color: var(--violet);
+  font-size: 24px;
+}
+
+.planMetrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0;
+}
+
+.planMetrics > div {
+  min-width: 0;
+}
+
+.planMetrics dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.rejectionList,
+.constraintEvidence ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 18px;
+  color: #8a2929;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.eligibleReason,
+.plannerEmpty,
+.plannerFormula {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.constraintEvidence summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.constraintEvidence ul {
+  margin-top: 10px;
+  color: var(--ink);
+}
+
+.constraintEvidence li {
+  display: grid;
+  gap: 2px;
+}
+
+.constraintEvidence li > strong {
+  color: var(--violet);
+  font-size: 9px;
+}
+
+.constraintEvidence small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 .routeGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -732,6 +902,16 @@ code {
   }
 
   .routeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .routePlannerHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .portfolioEvidence,
+  .planEvidenceGrid {
     grid-template-columns: 1fr;
   }
 
