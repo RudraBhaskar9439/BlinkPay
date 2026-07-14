@@ -1,0 +1,20 @@
+{
+  "name": "blinkpay",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.8.0",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @blinkpay/web dev",
+    "lint": "pnpm --filter @blinkpay/web lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "build": "pnpm -r --if-present build",
+    "rpc:check": "pnpm --filter @blinkpay/chain rpc:check",
+    "contracts:fmt": "cd packages/contracts && forge fmt --check",
+    "contracts:test": "cd packages/contracts && forge test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm contracts:fmt && pnpm contracts:test"
+  }
+}

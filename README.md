@@ -37,8 +37,42 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 ## Current status
 
 - [x] Phase 0A: repository and implementation plan
-- [ ] Phase 0B: application and contract toolchains
+- [x] Phase 0B: application and contract toolchains
 - [ ] Phase 1: signed invoice and direct USDC settlement
+
+The foundation gate passed on July 14, 2026. See
+[docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
+limitations.
+
+## Local development
+
+Prerequisites:
+
+- Node.js 22 (Node.js 20.9 or newer is supported)
+- pnpm 11.8.0
+- Foundry 1.7.1
+
+```bash
+cp .env.example .env.local
+pnpm install --frozen-lockfile
+pnpm check
+pnpm rpc:check
+pnpm dev
+```
+
+Open `http://localhost:3000`. The foundation screen reads the current Monad
+mainnet block through the server, so an offline or incorrect RPC is visible
+instead of being presented as a successful connection.
+
+## Workspace
+
+```text
+apps/web/                  Next.js application
+packages/chain/            Monad clients, addresses, and configuration tests
+packages/contracts/        Foundry contracts and Solidity tests
+docs/                      Architecture and phase evidence
+.github/workflows/ci.yml   Reproducible quality gate
+```
 
 ## Network
 
