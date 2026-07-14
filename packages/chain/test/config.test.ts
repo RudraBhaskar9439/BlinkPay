@@ -7,6 +7,7 @@ import {
   activeMonadNetwork,
   activeUsdcAddress,
   activeWmonAddress,
+  blinkPayTestnetDeployment,
   monadMainnet,
   monadTestnet,
   usdcAddresses,
@@ -37,6 +38,11 @@ describe("Monad configuration", () => {
     expect(getAddress(wmonAddresses.testnet)).toBe(wmonAddresses.testnet);
     expect(getAddress(zeroExAllowanceHolderAddresses.mainnet))
       .toBe(zeroExAllowanceHolderAddresses.mainnet);
+  });
+
+  it("tracks the verified BlinkPay testnet deployment", () => {
+    expect(getAddress(blinkPayTestnetDeployment.pool)).toBe(blinkPayTestnetDeployment.pool);
+    expect(getAddress(blinkPayTestnetDeployment.router)).toBe(blinkPayTestnetDeployment.router);
   });
 
   it("uses HTTPS public RPC defaults", () => {

@@ -42,7 +42,8 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [ ] Phase 1B: live Monad testnet deployment and two-wallet smoke test
 - [x] Phase 2A: exact-output WMON-to-USDC implementation
 - [x] Phase 2B: testnet pool and exact-output router integration
-- [ ] Phase 2C: fund testnet liquidity and complete a live WMON payment
+- [x] Phase 2C: deploy and fund verified testnet liquidity
+- [ ] Phase 2D: complete direct and WMON wallet-to-wallet payments
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
@@ -98,8 +99,13 @@ remains documented in [docs/PHASE_2_REPORT.md](docs/PHASE_2_REPORT.md).
 - Monad testnet WMON:
   `0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541`
 
-Contract and integration addresses will be kept in version-controlled chain
-configuration and independently verified before use.
+The verified testnet deployment is:
+
+- BlinkPay pool: `0x88a2208424bFB2D3fc4F299e92993FFe5fAFedb3`
+- BlinkPay router: `0x23f655e41F135d9b2FEfD7173342A8c30DF01e2f`
+
+These addresses are kept in version-controlled chain configuration and checked
+against their immutable onchain settings before the quote service uses them.
 
 ## Safety principles
 

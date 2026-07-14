@@ -3,6 +3,7 @@ import {
   activeMonadNetwork,
   activeUsdcAddress,
   activeWmonAddress,
+  blinkPayTestnetDeployment,
   createMonadPublicClient,
   monadMainnet,
   wmonAddresses,
@@ -36,8 +37,10 @@ export async function POST(request: Request) {
     const invoicePayload = requireString(body.invoicePayload, "invoicePayload");
     const payer = requireRequestAddress(body.payer, "payer");
     const { invoice } = decodeInvoiceRequest(invoicePayload);
+    const configuredRouter = process.env.NEXT_PUBLIC_BLINKPAY_ROUTER_ADDRESS
+      ?? (activeMonadNetwork === "testnet" ? blinkPayTestnetDeployment.router : undefined);
     const router = requireAddress(
-      process.env.NEXT_PUBLIC_BLINKPAY_ROUTER_ADDRESS,
+      configuredRouter,
       "NEXT_PUBLIC_BLINKPAY_ROUTER_ADDRESS",
     );
 
@@ -113,8 +116,10 @@ async function createTestnetQuote(
   invoiceExpiry: bigint,
   router: Address,
 ) {
+  const configuredPool = process.env.NEXT_PUBLIC_BLINKPAY_TESTNET_POOL_ADDRESS
+    ?? blinkPayTestnetDeployment.pool;
   const pool = requireAddress(
-    process.env.NEXT_PUBLIC_BLINKPAY_TESTNET_POOL_ADDRESS,
+    configuredPool,
     "NEXT_PUBLIC_BLINKPAY_TESTNET_POOL_ADDRESS",
   );
   const client = createMonadPublicClient("testnet");

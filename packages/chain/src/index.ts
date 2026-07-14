@@ -42,6 +42,11 @@ export const zeroExAllowanceHolderAddresses = {
   mainnet: "0x0000000000001fF3684f28c67538d4D072C22734",
 } as const;
 
+export const blinkPayTestnetDeployment = {
+  pool: "0x88a2208424bFB2D3fc4F299e92993FFe5fAFedb3",
+  router: "0x23f655e41F135d9b2FEfD7173342A8c30DF01e2f",
+} as const satisfies Record<"pool" | "router", Address>;
+
 export type MonadNetwork = "mainnet" | "testnet";
 
 export function getActiveMonadNetwork(): MonadNetwork {

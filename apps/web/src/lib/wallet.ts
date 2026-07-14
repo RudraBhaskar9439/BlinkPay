@@ -1,4 +1,8 @@
-import { activeMonadChain } from "@blinkpay/chain";
+import {
+  activeMonadChain,
+  activeMonadNetwork,
+  blinkPayTestnetDeployment,
+} from "@blinkpay/chain";
 import {
   createWalletClient,
   custom,
@@ -11,7 +15,8 @@ import {
 type BrowserWithEthereum = Window & { ethereum?: EIP1193Provider };
 
 export function getConfiguredRouterAddress(): Address {
-  const value = process.env.NEXT_PUBLIC_BLINKPAY_ROUTER_ADDRESS;
+  const value = process.env.NEXT_PUBLIC_BLINKPAY_ROUTER_ADDRESS
+    ?? (activeMonadNetwork === "testnet" ? blinkPayTestnetDeployment.router : undefined);
   if (!value || !isAddress(value, { strict: true })) {
     throw new Error("BlinkPay router is not configured for this deployment");
   }
@@ -19,7 +24,8 @@ export function getConfiguredRouterAddress(): Address {
 }
 
 export function getConfiguredTestnetPoolAddress(): Address {
-  const value = process.env.NEXT_PUBLIC_BLINKPAY_TESTNET_POOL_ADDRESS;
+  const value = process.env.NEXT_PUBLIC_BLINKPAY_TESTNET_POOL_ADDRESS
+    ?? (activeMonadNetwork === "testnet" ? blinkPayTestnetDeployment.pool : undefined);
   if (!value || !isAddress(value, { strict: true })) {
     throw new Error("BlinkPay testnet pool is not configured for this deployment");
   }
