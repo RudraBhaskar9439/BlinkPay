@@ -97,6 +97,10 @@ export function PayInvoice({ payload }: { payload?: string }) {
   const signedInvoice = parsed.value;
   const { invoice, description, signature } = signedInvoice;
   const displayAmount = formatUnits(invoice.amount, 6);
+  const directPlan = routeAnalysis?.plans.find((plan) => plan.id === "direct-usdc");
+  const swapPlan = routeAnalysis?.plans.find((plan) => plan.id === "swap-wmon");
+  const directUnavailable = directPlan?.status === "unavailable";
+  const swapUnavailable = swapPlan?.status === "unavailable";
   const expiry = new Date(Number(invoice.expiry) * 1_000).toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -617,8 +621,13 @@ export function PayInvoice({ payload }: { payload?: string }) {
             <p className="cardLabel">Route 01 · Direct</p>
             <h2>Pay from USDC</h2>
             <p>Spend exactly the invoice amount from your existing USDC balance.</p>
-            <button className="primaryButton" type="button" onClick={payDirect} disabled={busy}>
-              {busy ? "Preflighting…" : `Pay ${displayAmount} USDC`}
+            <button
+              className="primaryButton"
+              type="button"
+              onClick={payDirect}
+              disabled={busy || directUnavailable}
+            >
+              {directUnavailable ? "Route unavailable" : busy ? "Preflighting…" : `Pay ${displayAmount} USDC`}
             </button>
           </article>
 
@@ -644,8 +653,13 @@ export function PayInvoice({ payload }: { payload?: string }) {
                 {swapQuote ? "Refresh quote" : "Get live WMON quote"}
               </button>
               {swapQuote ? (
-                <button className="primaryButton" type="button" onClick={payWithWmon} disabled={busy}>
-                  Pay with WMON
+                <button
+                  className="primaryButton"
+                  type="button"
+                  onClick={payWithWmon}
+                  disabled={busy || swapUnavailable}
+                >
+                  {swapUnavailable ? "Route unavailable" : "Pay with WMON"}
                 </button>
               ) : null}
             </div>
