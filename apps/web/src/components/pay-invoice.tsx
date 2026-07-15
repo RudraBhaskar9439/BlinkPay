@@ -1080,9 +1080,15 @@ export function PayInvoice({ payload }: { payload?: string }) {
   return (
     <section className="checkoutShell" aria-labelledby="pay-title">
       <div className="checkoutIntro compactIntro">
-        <p className="sectionNumber">Exact USDC invoice</p>
+        <p className="sectionNumber">Secure checkout / Exact USDC</p>
         <h1 id="pay-title" className="checkoutTitle">Confirm before money moves.</h1>
       </div>
+
+      <ol className="flowSteps payerSteps" aria-label="Payment steps">
+        <li className="active"><span>01</span><strong>Review invoice</strong></li>
+        <li><span>02</span><strong>Compare routes</strong></li>
+        <li><span>03</span><strong>Approve in wallet</strong></li>
+      </ol>
 
       <div className="paymentReview">
         <div className="amountPanel">
@@ -1116,7 +1122,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
         <section className="policyCompiler" aria-labelledby="policy-compiler-title">
           <div className="policyCompilerHeader">
             <div>
-              <p className="cardLabel">Phase 4 · AI preference compiler</p>
+              <p className="cardLabel">AI preference guardrail</p>
               <h2 id="policy-compiler-title">Describe how your money should move.</h2>
             </div>
             <span className="policySource">
@@ -1169,7 +1175,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
         <section className="routePlanner" aria-labelledby="route-planner-title">
           <div className="routePlannerHeader">
             <div>
-              <p className="cardLabel">Phase 6 · Deterministic atomic planner</p>
+              <p className="cardLabel">Deterministic atomic planner</p>
               <h2 id="route-planner-title">Compare live payment evidence.</h2>
             </div>
             <button className="secondaryButton" type="button" onClick={analyzeRoutes} disabled={busy}>

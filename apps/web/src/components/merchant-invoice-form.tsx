@@ -124,13 +124,19 @@ export function MerchantInvoiceForm() {
   return (
     <section className="checkoutShell" aria-labelledby="invoice-title">
       <div className="checkoutIntro">
-        <p className="sectionNumber">Monad testnet / Signed invoice</p>
+        <p className="sectionNumber">Merchant checkout / Monad testnet</p>
         <h1 id="invoice-title" className="checkoutTitle">Request an exact USDC payment.</h1>
         <p className="lede">
           Your wallet signs the invoice offchain. The payer receives the amount,
           recipient, expiry, and description before approving anything.
         </p>
       </div>
+
+      <ol className="flowSteps" aria-label="Invoice creation steps">
+        <li className="active"><span>01</span><strong>Configure</strong></li>
+        <li><span>02</span><strong>Sign in wallet</strong></li>
+        <li><span>03</span><strong>Share link</strong></li>
+      </ol>
 
       <div className="checkoutGrid">
         <form className="formCard" onSubmit={createInvoice}>

@@ -1,5 +1,5 @@
 import { PayInvoice } from "@/components/pay-invoice";
-import Link from "next/link";
+import { AppHeader } from "@/components/app-header";
 
 export const metadata = {
   title: "Pay an invoice — BlinkPay",
@@ -14,13 +14,7 @@ export default async function PayPage({
 
   return (
     <main>
-      <nav className="nav" aria-label="Primary navigation">
-        <Link className="brand" href="/" aria-label="BlinkPay home">
-          <span className="brandMark" aria-hidden="true">B</span>
-          <span>BlinkPay</span>
-        </Link>
-        <span className="buildTag">Payer review</span>
-      </nav>
+      <AppHeader context="Checkout" />
       <PayInvoice payload={invoice} />
     </main>
   );

@@ -395,6 +395,12 @@ Make the working product understandable within three minutes.
 Submission is opened in an incognito browser and independently checked against
 every Spark requirement before it is sent.
 
+Status: UI checkpoint passed on July 15, 2026. The landing, merchant, and payer
+surfaces are product-polished and mobile responsive; the full automated release
+gate and browser overflow/touch checks pass. Public hosting, the demo video, and
+the final incognito submission rehearsal remain open. See
+`PHASE_8_REPORT.md`.
+
 ## Stretch Phase A — Borrow-to-pay
 
 Begin only after Phase 7 is green. Select one verified live collateral/USDC

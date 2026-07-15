@@ -8,7 +8,9 @@ test("landing page exposes the self-custodial payment flow", async ({ page }) =>
     "href",
     "/merchant",
   );
-  await expect(page.getByText("No custody. No server-side invoice database.")).toBeVisible();
+  await expect(page.getByText(/No custody/).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Helpful intelligence. Zero signing authority." }))
+    .toBeVisible();
 });
 
 test("merchant form fails safely when no injected wallet exists", async ({ page }) => {
@@ -29,13 +31,27 @@ test("malformed payment links never render executable controls", async ({ page }
   await expect(page.getByRole("link", { name: "Create a new invoice" })).toBeVisible();
 });
 
-test("release pages do not overflow a mobile viewport", async ({ page }, testInfo) => {
+test("release pages remain usable without overflow on mobile", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("mobile"), "mobile project only");
-  await page.goto("/merchant");
+  for (const path of ["/", "/merchant", "/pay?invoice=not-a-signed-invoice"]) {
+    await page.goto(path);
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(dimensions.scrollWidth, `${path} should not scroll horizontally`)
+      .toBeLessThanOrEqual(dimensions.clientWidth);
+  }
 
-  const dimensions = await page.evaluate(() => ({
-    clientWidth: document.documentElement.clientWidth,
-    scrollWidth: document.documentElement.scrollWidth,
-  }));
-  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+  await page.goto("/merchant");
+  const touchTargets = await page.locator(".formCard button, .navCta").evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { label: element.textContent?.trim(), width: rect.width, height: rect.height };
+    }),
+  );
+  for (const target of touchTargets) {
+    expect(target.height, `${target.label} should be touch friendly`).toBeGreaterThanOrEqual(40);
+    expect(target.width, `${target.label} should be touch friendly`).toBeGreaterThanOrEqual(40);
+  }
 });
