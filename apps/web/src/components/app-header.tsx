@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HeaderWallet } from "@/components/header-wallet";
 
 type AppHeaderProps = {
   context?: string;
@@ -27,11 +28,14 @@ export function AppHeader({ context }: AppHeaderProps) {
           <Link href="/#how-it-works">How it works</Link>
           <Link href="/#routes">Routes</Link>
           <Link href="/#safety">Safety</Link>
+          <Link href="/pay">Pay invoice</Link>
         </div>
 
         <div className="navActions">
-          <span className="networkPill"><i aria-hidden="true" />Monad Testnet</span>
+          <span className="networkPill monadBadge"><i aria-hidden="true">M</i><span>Built on Monad</span></span>
           {context ? <span className="contextPill">{context}</span> : null}
+          <Link className="payNavLink" href="/pay">Pay</Link>
+          <HeaderWallet />
           <Link className="navCta" href={action.href}>{action.label}</Link>
         </div>
       </nav>

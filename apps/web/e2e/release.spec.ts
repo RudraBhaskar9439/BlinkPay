@@ -11,6 +11,16 @@ test("landing page exposes the self-custodial payment flow", async ({ page }) =>
   await expect(page.getByText(/No custody/).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Helpful intelligence. Zero signing authority." }))
     .toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
+  await expect(page.getByText("Built on Monad")).toHaveCount(1);
+});
+
+test("payer portal opens signed payment links without wallet access", async ({ page }) => {
+  await page.goto("/pay");
+
+  await expect(page.getByRole("heading", { name: "Open a payment request." })).toBeVisible();
+  await expect(page.getByLabel("Payment link")).toBeVisible();
+  await expect(page.getByText("No wallet access yet")).toBeVisible();
 });
 
 test("merchant form fails safely when no injected wallet exists", async ({ page }) => {
@@ -44,11 +54,11 @@ test("release pages remain usable without overflow on mobile", async ({ page }, 
   }
 
   await page.goto("/merchant");
-  const touchTargets = await page.locator(".formCard button, .navCta").evaluateAll((elements) =>
+  const touchTargets = await page.locator(".formCard button, .payNavLink, .headerWallet").evaluateAll((elements) =>
     elements.map((element) => {
       const rect = element.getBoundingClientRect();
       return { label: element.textContent?.trim(), width: rect.width, height: rect.height };
-    }),
+    }).filter((target) => target.width > 0 && target.height > 0),
   );
   for (const target of touchTargets) {
     expect(target.height, `${target.label} should be touch friendly`).toBeGreaterThanOrEqual(40);

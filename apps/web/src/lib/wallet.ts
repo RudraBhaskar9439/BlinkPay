@@ -18,6 +18,7 @@ type InjectedProvider = EIP1193Provider & {
   removeListener?: (event: "accountsChanged", listener: (accounts: unknown) => void) => void;
 };
 type BrowserWithEthereum = Window & { ethereum?: InjectedProvider };
+const accountEventName = "blinkpay:account-changed";
 
 export function getConfiguredRouterAddress(): Address {
   const value = process.env.NEXT_PUBLIC_BLINKPAY_ROUTER_ADDRESS
@@ -69,6 +70,8 @@ export async function connectInjectedWallet() {
     transport: custom(provider),
   });
 
+  window.dispatchEvent(new CustomEvent<Address>(accountEventName, { detail: account }));
+
   return { account, walletClient };
 }
 
@@ -84,8 +87,13 @@ export function watchInjectedAccount(listener: AccountListener): () => void {
     accountEventReceived = true;
     if (active) listener(getPrimaryAccount(accounts));
   };
+  const handleBlinkPayAccount = (event: Event) => {
+    const account = (event as CustomEvent<Address>).detail;
+    if (active) listener(account);
+  };
 
   provider.on?.("accountsChanged", handleAccountsChanged);
+  window.addEventListener(accountEventName, handleBlinkPayAccount);
   void provider.request({ method: "eth_accounts" })
     .then((accounts) => {
       if (active && !accountEventReceived) listener(getPrimaryAccount(accounts));
@@ -95,6 +103,7 @@ export function watchInjectedAccount(listener: AccountListener): () => void {
   return () => {
     active = false;
     provider.removeListener?.("accountsChanged", handleAccountsChanged);
+    window.removeEventListener(accountEventName, handleBlinkPayAccount);
   };
 }
 
