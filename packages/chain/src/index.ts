@@ -44,7 +44,7 @@ export const zeroExAllowanceHolderAddresses = {
 
 export const blinkPayTestnetDeployment = {
   pool: "0x88a2208424bFB2D3fc4F299e92993FFe5fAFedb3",
-  router: "0x7d6cECbDfD0359887e34ce89c15a313f37c1Fa1B",
+  router: "0x6054f7E75E07f5d127DceEA3b2D683959a51c9AA",
   vault: "0xbb171586DE327A2c9BB2ea3A7D200B9A92fbeb89",
 } as const satisfies Record<"pool" | "router" | "vault", Address>;
 
