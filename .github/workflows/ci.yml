@@ -49,6 +49,12 @@ jobs:
       - name: Production build
         run: pnpm build
 
+      - name: Install Playwright browser
+        run: pnpm --filter @blinkpay/web exec playwright install --with-deps chromium
+
+      - name: Browser release tests
+        run: pnpm test:e2e
+
       - name: Solidity formatting
         run: pnpm contracts:fmt
 

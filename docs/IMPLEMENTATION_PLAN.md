@@ -29,7 +29,9 @@ path.
    allowlisted.
 6. Mainnet transactions use small amounts until the contracts have been
    reviewed and tested on a fork.
-7. Each completed phase ends with a tagged checkpoint or clearly named commit.
+7. The hackathon build runs on Monad testnet by default. Its testnet-only pool
+   is labelled as such and is never represented as 0x or production liquidity.
+8. Each completed phase ends with a tagged checkpoint or clearly named commit.
 
 ## 3. Planned repository layout
 
@@ -249,7 +251,10 @@ settle the invoice atomically.
 
 ### Implement
 
-- manually verified allowlist containing one liquid Euler/Euler Earn vault
+- immutable allowlist containing one verified vault; the hackathon testnet gate
+  uses an explicitly labelled BlinkPay ERC-4626 fixture because Euler's
+  official labels contain Monad mainnet (`143`) but no Monad testnet (`10143`)
+  vault list
 - vault share balance, `asset`, `previewWithdraw`, `maxWithdraw`, and liquidity
   reads
 - share approval/authorization flow
@@ -311,6 +316,11 @@ configured reserve remains and only the shortfall came from the second source.
 At least one split route completes as a single transaction and all balance
 deltas match the plan.
 
+Status: passed on July 15, 2026. The live testnet receipt combined 0.8 wallet
+USDC with an exact 0.2 USDC vault withdrawal. Merchant, payer, vault, allowance,
+router-residual, event, and replay deltas were independently verified at the
+payment block. See `PHASE_6_REPORT.md`.
+
 ## Phase 7 — Security hardening and release candidate
 
 ### Goal
@@ -347,6 +357,14 @@ wallets and small live amounts. Repeat it to prove it is not a one-off.
 CI is green, the hosted app works, contracts are verified, README setup is
 reproducible, and the demo can be completed twice without intervention.
 
+Status: passed on July 15, 2026 for the release-candidate scope. The hardened
+router has an exact Sourcify runtime match; the full automated, invariant,
+pinned-fork, browser, dependency, and secret gates pass; pause/unpause was
+exercised live; and a fresh merchant-to-payer flow settled exactly 0.1 USDC
+with zero router residuals and replay rejection. Public hosting and the final
+incognito submission rehearsal remain Phase 8 deliverables. See
+`PHASE_7_REPORT.md`.
+
 ## Phase 8 — Hackathon submission
 
 ### Goal
@@ -376,6 +394,12 @@ Make the working product understandable within three minutes.
 
 Submission is opened in an incognito browser and independently checked against
 every Spark requirement before it is sent.
+
+Status: UI checkpoint passed on July 15, 2026. The landing, merchant, and payer
+surfaces are product-polished and mobile responsive; the full automated release
+gate and browser overflow/touch checks pass. Public hosting, the demo video, and
+the final incognito submission rehearsal remain open. See
+`PHASE_8_REPORT.md`.
 
 ## Stretch Phase A — Borrow-to-pay
 
