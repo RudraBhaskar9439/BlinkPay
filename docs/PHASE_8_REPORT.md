@@ -2,11 +2,12 @@
 
 ## Status
 
-The Phase 8 interface checkpoint is complete on July 15, 2026. BlinkPay now
-presents the working payment system as a cohesive product on desktop, tablet,
-and phone layouts. Public hosting, the final demo video, and the submission
-rehearsal remain open before the hackathon submission gate can be marked
-complete.
+The Phase 8 release checkpoint is complete on July 15, 2026. BlinkPay now
+presents the working payment system as a cohesive public product on desktop,
+tablet, and phone layouts. The canonical production deployment, public
+repository, submission copy, architecture, screenshots, timed demo script, and
+signed-out link audit are complete. Recording the public demo video and a final
+wallet-signed rehearsal remain owner-operated submission steps.
 
 ## Product changes
 
@@ -31,10 +32,19 @@ complete.
 - Manual visual QA at 1440 × 900 and 390 × 844 for the landing, merchant, and
   signed payer pages.
 - No horizontal overflow observed across the tested product surfaces.
-- Browser suite: 7 passing checks and 1 intentional desktop skip.
+- Browser suite: 9 passing checks and 1 intentional desktop skip.
 - TypeScript, ESLint, package tests, production build, Forge formatting, and all
   60 Solidity tests pass.
 - Contract regression totals remain 512 fuzz cases and 24,576 invariant calls.
+- The production Groq endpoint compiled a live natural-language preference into
+  the strict policy schema while transaction construction remained deterministic.
+- The canonical production URL, public repository, raw README, router explorer,
+  and hardened payment receipt were checked while signed out.
+- Gitleaks found no tracked or historical secrets after applying a narrow
+  allowlist for two public test-token addresses, and the production dependency
+  audit reported no known vulnerabilities.
+- Production responses include content-type, referrer, frame, and browser
+  permissions hardening headers.
 
 ## Safety boundary
 
@@ -42,9 +52,12 @@ This checkpoint changes presentation only. Invoice signing, quote validation,
 deterministic planning, approval handling, transaction simulation, atomic
 settlement, replay protection, and receipt verification are unchanged.
 
-## Remaining Phase 8 work
+## Owner-operated submission steps
 
-1. Publish the production build with testnet environment configuration.
-2. Run the complete merchant-to-payer flow from an incognito mobile browser.
-3. Record the sub-three-minute demo and capture final submission screenshots.
-4. Audit all submission links and claims against the Spark requirements.
+1. Rotate the previously disclosed local Foundry keystore password
+   interactively; never send the replacement through chat or commit it.
+2. Run one final merchant-to-payer production flow with MetaMask and the small
+   testnet wallets used for the live acceptance transactions.
+3. Record and publish the sub-three-minute demo using `DEMO_SCRIPT.md`, then add
+   its public URL to `SUBMISSION.md` and the Spark form.
+4. Publish `SOCIAL_POST.md` only when entering the optional viral prize.
