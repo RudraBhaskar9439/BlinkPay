@@ -316,6 +316,11 @@ configured reserve remains and only the shortfall came from the second source.
 At least one split route completes as a single transaction and all balance
 deltas match the plan.
 
+Status: passed on July 15, 2026. The live testnet receipt combined 0.8 wallet
+USDC with an exact 0.2 USDC vault withdrawal. Merchant, payer, vault, allowance,
+router-residual, event, and replay deltas were independently verified at the
+payment block. See `PHASE_6_REPORT.md`.
+
 ## Phase 7 — Security hardening and release candidate
 
 ### Goal

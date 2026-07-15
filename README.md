@@ -52,6 +52,9 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 5A: atomic ERC-4626 vault settlement and deterministic constraints
 - [x] Phase 5B: live Monad testnet vault/router deployment and funded payer position
 - [x] Phase 5C: payer-signed vault payment and independently verified receipt
+- [x] Phase 6A: atomic direct-plus-vault and direct-plus-WMON contracts
+- [x] Phase 6B: reserve-aware split planner and five-route checkout
+- [x] Phase 6C: live direct-plus-vault payment with verified two-source deltas
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
@@ -79,6 +82,12 @@ allowlisted vault, underlying USDC, share balance and allowance,
 testnet vault is a clearly labelled BlinkPay fixture—not an Euler deployment—
 because Euler's official labels currently contain Monad mainnet entries but no
 Monad testnet vault list. See [docs/PHASE_5_REPORT.md](docs/PHASE_5_REPORT.md).
+
+Phase 6 adds atomic split settlement. Spendable wallet USDC funds the first
+leg, and either an exact ERC-4626 withdrawal or exact-output WMON swap funds
+only the remaining shortfall. The live gate settled a 1 USDC invoice from 0.8
+wallet USDC plus 0.2 vault USDC in one router call with zero retained balances
+and replay protection. See [docs/PHASE_6_REPORT.md](docs/PHASE_6_REPORT.md).
 
 ## Local development
 
@@ -135,7 +144,7 @@ remains documented in [docs/PHASE_2_REPORT.md](docs/PHASE_2_REPORT.md).
 The verified testnet deployment is:
 
 - BlinkPay pool: `0x88a2208424bFB2D3fc4F299e92993FFe5fAFedb3`
-- BlinkPay three-route router: `0x029a2AE62021A11E1b2F13a386F89762eC15C915`
+- BlinkPay five-route router: `0x7d6cECbDfD0359887e34ce89c15a313f37c1Fa1B`
 - BlinkPay testnet ERC-4626 vault: `0xbb171586DE327A2c9BB2ea3A7D200B9A92fbeb89`
 
 These addresses are kept in version-controlled chain configuration and checked
