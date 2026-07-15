@@ -9,6 +9,7 @@ function input(overrides: Partial<PlannerInput> = {}): PlannerInput {
     invoiceAmount: 100_000n,
     invoiceExpiry: NOW + 1_800n,
     invoiceAlreadyPaid: false,
+    paymentsPaused: false,
     direct: {
       balance: 900_000n,
       allowance: 0n,
@@ -92,6 +93,15 @@ describe("deterministic payment planner", () => {
     const direct = result.plans.find((plan) => plan.id === "direct-usdc");
     expect(direct?.status).toBe("unavailable");
     expect(direct?.rejectionReasons.join(" ")).toContain("execution reverted");
+  });
+
+  it("makes every route unavailable while emergency pause is active", () => {
+    const result = buildPaymentPlans(input({ paymentsPaused: true }));
+
+    expect(result.recommendedPlanId).toBeUndefined();
+    expect(result.plans.every((plan) => plan.status === "unavailable")).toBe(true);
+    expect(result.plans.every((plan) => plan.rejectionReasons.join(" ")
+      .includes("Emergency payment pause is active"))).toBe(true);
   });
 
   it("returns a recoverable unavailable swap plan when quoting fails", () => {

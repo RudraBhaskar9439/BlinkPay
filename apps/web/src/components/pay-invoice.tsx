@@ -220,13 +220,18 @@ export function PayInvoice({ payload }: { payload?: string }) {
       setAccount(wallet.account);
       setMessage("Reading live balances, allowances, replay state, and quotes…");
 
-      const [invoiceAlreadyPaid, nativeBalance, usdcBalance, usdcAllowance, wmonBalance,
-        wmonAllowance] = await Promise.all([
+      const [invoiceAlreadyPaid, paymentsPaused, nativeBalance, usdcBalance, usdcAllowance,
+        wmonBalance, wmonAllowance] = await Promise.all([
         client.readContract({
           address: routerAddress,
           abi: blinkPayRouterAbi,
           functionName: "paidInvoices",
           args: [invoice.invoiceId],
+        }),
+        client.readContract({
+          address: routerAddress,
+          abi: blinkPayRouterAbi,
+          functionName: "paymentsPaused",
         }),
         client.getBalance({ address: wallet.account }),
         client.readContract({
@@ -395,6 +400,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
         invoiceAmount: invoice.amount,
         invoiceExpiry: invoice.expiry,
         invoiceAlreadyPaid,
+        paymentsPaused,
         direct: {
           balance: usdcBalance,
           allowance: usdcAllowance,
@@ -498,6 +504,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
       const wallet = await connectInjectedWallet();
       const client = createMonadPublicClient(activeMonadNetwork);
       setAccount(wallet.account);
+      await assertPaymentsActive(client, routerAddress);
       setMessage("Checking balance, replay status, and allowance…");
 
       const [alreadyPaid, balance, allowance] = await Promise.all([
@@ -628,6 +635,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
       const wallet = await connectInjectedWallet();
       const client = createMonadPublicClient(activeMonadNetwork);
       setAccount(wallet.account);
+      await assertPaymentsActive(client, routerAddress);
       setMessage("Checking WMON balance, replay status, and router allowance…");
 
       const [alreadyPaid, balance, allowance] = await Promise.all([
@@ -735,6 +743,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
       const wallet = await connectInjectedWallet();
       const client = createMonadPublicClient(activeMonadNetwork);
       setAccount(wallet.account);
+      await assertPaymentsActive(client, routerAddress);
       setMessage("Verifying the allowlisted vault, liquidity, shares, and allowance…");
 
       const [alreadyPaid, facts] = await Promise.all([
@@ -826,6 +835,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
       const wallet = await connectInjectedWallet();
       const client = createMonadPublicClient(activeMonadNetwork);
       setAccount(wallet.account);
+      await assertPaymentsActive(client, routerAddress);
       setMessage("Rechecking both split legs and the protected vault maximum…");
 
       const [alreadyPaid, usdcBalance, usdcAllowance] = await Promise.all([
@@ -949,6 +959,7 @@ export function PayInvoice({ payload }: { payload?: string }) {
       const wallet = await connectInjectedWallet();
       const client = createMonadPublicClient(activeMonadNetwork);
       setAccount(wallet.account);
+      await assertPaymentsActive(client, routerAddress);
       setMessage("Rechecking direct USDC, WMON maximum, and both allowances…");
       const [alreadyPaid, usdcBalance, usdcAllowance, wmonBalance, wmonAllowance] =
         await Promise.all([
@@ -1894,4 +1905,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function getCurrentUnixTime(): bigint {
   return BigInt(Math.floor(Date.now() / 1_000));
+}
+
+async function assertPaymentsActive(
+  client: MonadPublicClient,
+  routerAddress: Address,
+): Promise<void> {
+  const paused = await client.readContract({
+    address: routerAddress,
+    abi: blinkPayRouterAbi,
+    functionName: "paymentsPaused",
+  });
+  if (paused) throw new Error("BlinkPay payments are temporarily paused for safety");
 }

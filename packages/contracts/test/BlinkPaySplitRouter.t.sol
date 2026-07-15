@@ -254,6 +254,39 @@ contract BlinkPaySplitRouterTest {
         router.payDirect(invoice, signature);
     }
 
+    function testFuzzDirectVaultSplitSettlesExactShortfall(
+        uint256 rawInvoiceAmount,
+        uint256 rawDirectAmount
+    ) public {
+        uint256 invoiceAmount = _bound(rawInvoiceAmount, 2, 400_000_000);
+        uint256 directAmount = _bound(rawDirectAmount, 1, invoiceAmount - 1);
+        uint256 vaultAmount = invoiceAmount - directAmount;
+        BlinkPayRouter.Invoice memory invoice = BlinkPayRouter.Invoice({
+            invoiceId: keccak256(abi.encode("fuzz-split", invoiceAmount, directAmount)),
+            merchant: merchant,
+            settlementToken: address(settlementToken),
+            amount: invoiceAmount,
+            expiry: block.timestamp + 1 hours,
+            nonce: invoiceAmount + directAmount,
+            chainId: block.chainid,
+            metadataHash: keccak256("Fuzz atomic split")
+        });
+        bytes memory signature = _sign(invoice);
+        uint256 maximumShares = vault.previewWithdraw(vaultAmount);
+
+        vm.prank(payer);
+        router.paySplitWithVault(invoice, signature, directAmount, maximumShares);
+
+        require(settlementToken.balanceOf(merchant) == invoiceAmount, "merchant amount wrong");
+        require(
+            settlementToken.balanceOf(payer) == STARTING_SETTLEMENT - DEPOSIT_ASSETS - directAmount,
+            "direct amount wrong"
+        );
+        require(vault.balanceOf(payer) == DEPOSIT_ASSETS - vaultAmount, "shortfall wrong");
+        require(router.paidInvoices(invoice.invoiceId), "invoice not paid");
+        _assertRouterEmpty();
+    }
+
     function _validInvoice(string memory salt)
         private
         view
@@ -310,5 +343,13 @@ contract BlinkPaySplitRouterTest {
         require(settlementToken.balanceOf(address(router)) == 0, "router retained USDC");
         require(sellToken.balanceOf(address(router)) == 0, "router retained sell token");
         require(vault.balanceOf(address(router)) == 0, "router retained shares");
+    }
+
+    function _bound(uint256 value, uint256 minimum, uint256 maximum)
+        private
+        pure
+        returns (uint256)
+    {
+        return minimum + value % (maximum - minimum + 1);
     }
 }

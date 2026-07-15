@@ -5,7 +5,7 @@ import { MockUSDC } from "../src/MockUSDC.sol";
 
 contract TokenSpender {
     function pull(MockUSDC token, address owner, address receiver, uint256 amount) external {
-        token.transferFrom(owner, receiver, amount);
+        require(token.transferFrom(owner, receiver, amount), "transferFrom failed");
     }
 }
 
@@ -26,7 +26,7 @@ contract MockUSDCTest {
 
     function testMintAndTransfer() public {
         token.mint(address(this), 10_000_000);
-        token.transfer(RECEIVER, 2_500_000);
+        require(token.transfer(RECEIVER, 2_500_000), "transfer failed");
 
         require(token.balanceOf(address(this)) == 7_500_000, "wrong sender balance");
         require(token.balanceOf(RECEIVER) == 2_500_000, "wrong receiver balance");

@@ -17,6 +17,9 @@ export const blinkPayRouterAbi = parseAbi([
   "function paySplitWithVault(Invoice invoice, bytes merchantSignature, uint256 directAmount, uint256 maxShares)",
   "function paySplitWithSwap(Invoice invoice, bytes merchantSignature, uint256 directAmount, uint256 maxSellAmount, uint256 quoteDeadline, bytes swapCallData)",
   "function paidInvoices(bytes32 invoiceId) view returns (bool)",
+  "function owner() view returns (address)",
+  "function paymentsPaused() view returns (bool)",
+  "function setPaymentsPaused(bool paused)",
   "function settlementAsset() view returns (address)",
   "function sellAsset() view returns (address)",
   "function swapTarget() view returns (address)",
@@ -27,6 +30,7 @@ export const blinkPayRouterAbi = parseAbi([
   "event VaultPaymentSettled(bytes32 indexed invoiceId, address indexed payer, address indexed vault, uint256 settlementAmount, uint256 maximumShares, uint256 sharesRedeemed)",
   "event DirectVaultSplitSettled(bytes32 indexed invoiceId, address indexed payer, address indexed vault, uint256 directAmount, uint256 vaultAmount, uint256 maximumShares, uint256 sharesRedeemed)",
   "event DirectSwapSplitSettled(bytes32 indexed invoiceId, address indexed payer, address indexed sellToken, uint256 directAmount, uint256 swapOutputAmount, uint256 maximumSellAmount, uint256 actualSellAmount, uint256 refundedSellAmount)",
+  "event PaymentsPauseUpdated(bool paused, address indexed operator)",
 ]);
 
 export const erc4626Abi = parseAbi([

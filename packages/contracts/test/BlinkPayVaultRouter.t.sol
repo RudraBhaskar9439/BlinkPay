@@ -96,7 +96,7 @@ contract BlinkPayVaultRouterTest {
         address donor = vm.addr(0xD0A0);
         settlementToken.mint(donor, 125_000_000);
         vm.prank(donor);
-        settlementToken.transfer(address(vault), 125_000_000);
+        require(settlementToken.transfer(address(vault), 125_000_000), "vault donation failed");
 
         uint256 maximumShares = vault.previewWithdraw(INVOICE_AMOUNT);
         require(maximumShares < INVOICE_AMOUNT, "donation did not raise share price");

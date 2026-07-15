@@ -39,6 +39,7 @@ export type ConstraintResult = {
   id:
     | "invoice-active"
     | "invoice-unpaid"
+    | "payments-active"
     | "quote-available"
     | "quote-fresh"
     | "balance-sufficient"
@@ -116,6 +117,7 @@ export type PlannerInput = {
   invoiceAmount: bigint;
   invoiceExpiry: bigint;
   invoiceAlreadyPaid: boolean;
+  paymentsPaused: boolean;
   direct: {
     balance: bigint;
     allowance: bigint;
@@ -771,6 +773,14 @@ function buildSwapPlan(input: PlannerInput): PaymentPlan {
 
 function commonConstraints(input: PlannerInput): ConstraintResult[] {
   return [
+    {
+      id: "payments-active",
+      label: "Router is accepting new payments",
+      status: input.paymentsPaused ? "fail" : "pass",
+      evidence: input.paymentsPaused
+        ? "Emergency payment pause is active"
+        : "Emergency payment pause is inactive",
+    },
     {
       id: "invoice-unpaid",
       label: "Invoice has not been paid",

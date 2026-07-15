@@ -15,6 +15,7 @@
     "rpc:check": "pnpm --filter @blinkpay/chain rpc:check",
     "contracts:fmt": "cd packages/contracts && forge fmt --check",
     "contracts:test": "cd packages/contracts && forge test",
+    "test:e2e": "pnpm --filter @blinkpay/web test:e2e",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm contracts:fmt && pnpm contracts:test"
   },
   "devDependencies": {

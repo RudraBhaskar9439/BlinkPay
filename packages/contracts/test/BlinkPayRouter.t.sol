@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import { BlinkPayRouter } from "../src/BlinkPayRouter.sol";
 import { MockUSDC } from "../src/MockUSDC.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 interface Vm {
     function addr(uint256 privateKey) external returns (address);
@@ -189,6 +190,38 @@ contract BlinkPayRouterTest {
     function testConstructorRejectsNonContractAsset() public {
         vm.expectRevert(BlinkPayRouter.InvalidSettlementAsset.selector);
         new BlinkPayRouter(address(0x1234));
+    }
+
+    function testDeployerOwnsEmergencyPauseControl() public view {
+        require(router.owner() == address(this), "unexpected owner");
+        require(!router.paymentsPaused(), "router starts paused");
+    }
+
+    function testOnlyOwnerCanPausePayments() public {
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, payer));
+        vm.prank(payer);
+        router.setPaymentsPaused(true);
+
+        require(!router.paymentsPaused(), "unauthorized pause changed state");
+    }
+
+    function testPauseBlocksPaymentAndUnpauseRestoresIt() public {
+        BlinkPayRouter.Invoice memory invoice = _validInvoice();
+        bytes memory signature = _sign(invoice, MERCHANT_KEY);
+        router.setPaymentsPaused(true);
+
+        vm.expectRevert(BlinkPayRouter.PaymentsPaused.selector);
+        vm.prank(payer);
+        router.payDirect(invoice, signature);
+
+        require(!router.paidInvoices(invoice.invoiceId), "paused invoice marked paid");
+        require(token.balanceOf(payer) == STARTING_BALANCE, "paused payer balance changed");
+        require(token.balanceOf(merchant) == 0, "paused merchant balance changed");
+
+        router.setPaymentsPaused(false);
+        vm.prank(payer);
+        router.payDirect(invoice, signature);
+        require(router.paidInvoices(invoice.invoiceId), "unpaused payment failed");
     }
 
     function _validInvoice() private view returns (BlinkPayRouter.Invoice memory) {

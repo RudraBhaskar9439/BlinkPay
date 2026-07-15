@@ -7,3 +7,5 @@ allowBuilds:
   unrs-resolver: true
 minimumReleaseAgeExclude:
   - viem@2.55.2
+overrides:
+  postcss: 8.5.19

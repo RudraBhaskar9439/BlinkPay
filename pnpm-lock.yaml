@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  postcss: 8.5.19
+
 importers:
 
   .:
@@ -34,7 +37,7 @@ importers:
         version: 17.2.3
       next:
         specifier: 16.2.10
-        version: 16.2.10(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 16.2.10(@babel/core@7.29.7)(@playwright/test@1.55.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       qrcode:
         specifier: 1.5.4
         version: 1.5.4
@@ -48,6 +51,9 @@ importers:
         specifier: 2.55.2
         version: 2.55.2(typescript@5.9.3)(zod@4.4.3)
     devDependencies:
+      '@playwright/test':
+        specifier: 1.55.1
+        version: 1.55.1
       '@types/node':
         specifier: 22.20.1
         version: 22.20.1
@@ -718,6 +724,11 @@ packages:
 
   '@oxc-project/types@0.139.0':
     resolution: {integrity: sha512-r9gHphtCs+1M7J0pw6Sn/hh/Wpa/iQrOOkrNAlVLF/gHq+/CJmHIWKKUUhdWjcD6CIa8idarspCsASiXCXvFUw==}
+
+  '@playwright/test@1.55.1':
+    resolution: {integrity: sha512-IVAh/nOJaw6W9g+RJVlIQJ6gSiER+ae6mKQ5CX1bERzQgbC1VSeBlwdvczT7pxb0GWiyrxH4TGKbMfDb4Sq/ig==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   '@rolldown/binding-android-arm64@1.1.5':
     resolution: {integrity: sha512-lZg8fqIv2v7FF237bwMgzGZEJvGL79/s5knJ/i6FmsGF4XXlzccZ4jb+TrFIxtSSxFtIpdsgrPZeMk1I9AFcyQ==}
@@ -1563,6 +1574,11 @@ packages:
     resolution: {integrity: sha512-dKx12eRCVIzqCxFGplyFKJMPvLEWgmNtUrpTiJIR5u97zEhRG8ySrtboPHZXx7daLxQVrl643cTzbab2tkQjxg==}
     engines: {node: '>= 0.4'}
 
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -2119,6 +2135,16 @@ packages:
     resolution: {integrity: sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==}
     engines: {node: '>=12'}
 
+  playwright-core@1.55.1:
+    resolution: {integrity: sha512-Z6Mh9mkwX+zxSlHqdr5AOcJnfp+xUWLCt9uKV18fhzA8eyxUd8NUWzAjxUh55RZKSYwDGX0cfaySdhZJGMoJ+w==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  playwright@1.55.1:
+    resolution: {integrity: sha512-cJW4Xd/G3v5ovXtJJ52MAOclqeac9S/aGGgRzLabuF8TnIb6xHvMzKIa6JmrRzUkeXJgfL1MhukP0NK6l39h3A==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   pngjs@5.0.0:
     resolution: {integrity: sha512-40QW5YalBNfQo5yRYmiw7Yz6TKKVr3h6970B2YE+3fQpsWcrbj1PzJgxeJ19DRQjhMbKPIuMY8rFaXc8moolVw==}
     engines: {node: '>=10.13.0'}
@@ -2126,10 +2152,6 @@ packages:
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
     engines: {node: '>= 0.4'}
-
-  postcss@8.4.31:
-    resolution: {integrity: sha512-PS08Iboia9mts/2ygV3eLpY5ghnUcfLV/EXTOW1E2qYxJKGGBUtNjN76FYHnMs36RmARn41bC0AZmn+rR0OVpQ==}
-    engines: {node: ^10 || ^12 || >=14}
 
   postcss@8.5.19:
     resolution: {integrity: sha512-Mz8SaolMd8nB+G13WkORcxQKHZ/NE4xXevtkJHVuG+guo9/wYKlIMTKAqGdEmYOXR2ijPjTYNHssizdaVSUNdQ==}
@@ -3073,6 +3095,10 @@ snapshots:
   '@openzeppelin/contracts@5.6.1': {}
 
   '@oxc-project/types@0.139.0': {}
+
+  '@playwright/test@1.55.1':
+    dependencies:
+      playwright: 1.55.1
 
   '@rolldown/binding-android-arm64@1.1.5':
     optional: true
@@ -4048,6 +4074,9 @@ snapshots:
     dependencies:
       is-callable: 1.2.7
 
+  fsevents@2.3.2:
+    optional: true
+
   fsevents@2.3.3:
     optional: true
 
@@ -4440,13 +4469,13 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  next@16.2.10(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  next@16.2.10(@babel/core@7.29.7)(@playwright/test@1.55.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       '@next/env': 16.2.10
       '@swc/helpers': 0.5.15
       baseline-browser-mapping: 2.10.43
       caniuse-lite: 1.0.30001805
-      postcss: 8.4.31
+      postcss: 8.5.19
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
       styled-jsx: 5.1.6(@babel/core@7.29.7)(react@19.2.7)
@@ -4459,6 +4488,7 @@ snapshots:
       '@next/swc-linux-x64-musl': 16.2.10
       '@next/swc-win32-arm64-msvc': 16.2.10
       '@next/swc-win32-x64-msvc': 16.2.10
+      '@playwright/test': 1.55.1
       sharp: 0.34.5
     transitivePeerDependencies:
       - '@babel/core'
@@ -4583,15 +4613,17 @@ snapshots:
 
   picomatch@4.0.5: {}
 
+  playwright-core@1.55.1: {}
+
+  playwright@1.55.1:
+    dependencies:
+      playwright-core: 1.55.1
+    optionalDependencies:
+      fsevents: 2.3.2
+
   pngjs@5.0.0: {}
 
   possible-typed-array-names@1.1.0: {}
-
-  postcss@8.4.31:
-    dependencies:
-      nanoid: 3.3.16
-      picocolors: 1.1.1
-      source-map-js: 1.2.1
 
   postcss@8.5.19:
     dependencies:

@@ -17,6 +17,7 @@ contract BlinkPaySwapRouter is BlinkPayRouter {
     mapping(bytes4 selector => bool allowed) public allowedSwapSelectors;
 
     error InexactSwapOutput(uint256 expected, uint256 received);
+    error InexactSellInput(uint256 expected, uint256 received);
     error InvalidMaxSellAmount();
     error InvalidQuoteDeadline(uint256 quoteDeadline, uint256 invoiceExpiry);
     error InvalidSwapConfiguration();
@@ -100,6 +101,7 @@ contract BlinkPaySwapRouter is BlinkPayRouter {
         if (quoteDeadline > invoiceExpiry) {
             revert InvalidQuoteDeadline(quoteDeadline, invoiceExpiry);
         }
+        // forge-lint: disable-next-line(block-timestamp)
         if (quoteDeadline < block.timestamp) {
             revert SwapQuoteExpired(quoteDeadline, block.timestamp);
         }
@@ -118,6 +120,10 @@ contract BlinkPaySwapRouter is BlinkPayRouter {
         uint256 settlementBalanceBefore = settlementAsset.balanceOf(address(this));
 
         sellAsset.safeTransferFrom(msg.sender, address(this), maxSellAmount);
+        uint256 sellBalanceFunded = sellAsset.balanceOf(address(this));
+        uint256 funded =
+            sellBalanceFunded >= sellBalanceBefore ? sellBalanceFunded - sellBalanceBefore : 0;
+        if (funded != maxSellAmount) revert InexactSellInput(maxSellAmount, funded);
         sellAsset.forceApprove(allowanceTarget, maxSellAmount);
 
         (bool success, bytes memory reason) = swapTarget.call(swapCallData);

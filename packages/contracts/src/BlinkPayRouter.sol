@@ -4,12 +4,13 @@ pragma solidity 0.8.30;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { SignatureChecker } from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
 /// @title BlinkPayRouter
 /// @notice Settles merchant-signed invoices in an exact, allowlisted ERC-20 asset.
-contract BlinkPayRouter is EIP712, ReentrancyGuard {
+contract BlinkPayRouter is EIP712, ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
     string public constant DOMAIN_NAME = "BlinkPay";
@@ -32,6 +33,7 @@ contract BlinkPayRouter is EIP712, ReentrancyGuard {
 
     IERC20 public immutable settlementAsset;
     mapping(bytes32 invoiceId => bool paid) public paidInvoices;
+    bool public paymentsPaused;
 
     error EmptyInvoiceId();
     error InexactFundingInput(uint256 expected, uint256 received);
@@ -44,6 +46,7 @@ contract BlinkPayRouter is EIP712, ReentrancyGuard {
     error InvoiceExpired(uint256 expiry, uint256 currentTimestamp);
     error InvoiceAlreadyPaid(bytes32 invoiceId);
     error InvalidSettlementAsset();
+    error PaymentsPaused();
 
     event PaymentSettled(
         bytes32 indexed invoiceId,
@@ -54,11 +57,20 @@ contract BlinkPayRouter is EIP712, ReentrancyGuard {
         uint256 merchantNonce
     );
 
-    constructor(address settlementToken) EIP712(DOMAIN_NAME, DOMAIN_VERSION) {
+    event PaymentsPauseUpdated(bool paused, address indexed operator);
+
+    constructor(address settlementToken) EIP712(DOMAIN_NAME, DOMAIN_VERSION) Ownable(msg.sender) {
         if (settlementToken == address(0) || settlementToken.code.length == 0) {
             revert InvalidSettlementAsset();
         }
         settlementAsset = IERC20(settlementToken);
+    }
+
+    /// @notice Enables or disables new payments during an incident.
+    /// @dev Existing receipts and invoice signatures remain readable while paused.
+    function setPaymentsPaused(bool paused) external onlyOwner {
+        paymentsPaused = paused;
+        emit PaymentsPauseUpdated(paused, msg.sender);
     }
 
     /// @notice Pays an invoice from the caller's approved settlement-token balance.
@@ -106,12 +118,14 @@ contract BlinkPayRouter is EIP712, ReentrancyGuard {
         internal
         view
     {
+        if (paymentsPaused) revert PaymentsPaused();
         if (invoice.invoiceId == bytes32(0)) revert EmptyInvoiceId();
         if (invoice.merchant == address(0)) revert InvalidMerchant();
         if (invoice.amount == 0) revert InvalidAmount();
         if (invoice.chainId != block.chainid) {
             revert InvalidChainId(block.chainid, invoice.chainId);
         }
+        // forge-lint: disable-next-line(block-timestamp)
         if (invoice.expiry < block.timestamp) {
             revert InvoiceExpired(invoice.expiry, block.timestamp);
         }
