@@ -8,11 +8,17 @@ test("landing page exposes the self-custodial payment flow", async ({ page }) =>
     "href",
     "/merchant",
   );
+  await expect(page.getByRole("link", { name: "Open payment link" })).toHaveAttribute(
+    "href",
+    "/pay",
+  );
   await expect(page.getByText(/No custody/).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Helpful intelligence. Zero signing authority." }))
     .toBeVisible();
   await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
   await expect(page.getByText("Built on Monad")).toHaveCount(1);
+  await expect(page.getByRole("link", { name: /Inspect a verified payment/i }))
+    .toHaveAttribute("href", /testnet\.monadscan\.com\/tx\/0xb4a23e/);
 });
 
 test("payer portal opens signed payment links without wallet access", async ({ page }) => {

@@ -28,6 +28,7 @@ export default function Home() {
           </p>
           <div className="heroActions">
             <a className="primaryButton buttonLink" href="/merchant">Create a signed invoice <span aria-hidden="true">↗</span></a>
+            <a className="secondaryButton buttonLink" href="/pay">Open payment link <span aria-hidden="true">→</span></a>
             <a className="textLink" href="#how-it-works">See how routing works <span aria-hidden="true">↓</span></a>
           </div>
           <div className="heroProof" aria-label="BlinkPay assurances">
@@ -141,12 +142,26 @@ export default function Home() {
         <p className="sectionNumber">Ready on Monad testnet</p>
         <h2>Make every asset feel spendable.</h2>
         <a className="primaryButton buttonLink" href="/merchant">Create your first invoice <span aria-hidden="true">↗</span></a>
+        <a
+          className="textLink"
+          href="https://testnet.monadscan.com/tx/0xb4a23e00583b366aee730f0a6cdbe11544efb1d9a129687979e9b0fa71328571"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Inspect a verified payment <span aria-hidden="true">↗</span>
+        </a>
       </section>
 
       <footer>
         <a className="brand footerBrand" href="#top"><span className="brandMark" aria-hidden="true">B</span><span>BlinkPay</span></a>
         <p>Self-custodial payment intelligence on Monad.</p>
-        <span>Testnet · 2026</span>
+        <a
+          href="https://testnet.monadscan.com/address/0x6054f7E75E07f5d127DceEA3b2D683959a51c9AA"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Testnet contract ↗
+        </a>
       </footer>
     </main>
   );

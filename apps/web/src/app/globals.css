@@ -956,8 +956,11 @@ footer p {
   text-align: center;
 }
 
-footer > span {
+footer > span,
+footer > a {
+  color: inherit;
   text-align: right;
+  text-underline-offset: 4px;
 }
 
 .footerBrand {

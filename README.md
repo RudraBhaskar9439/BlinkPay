@@ -1,12 +1,26 @@
 # BlinkPay
 
+**One exact USDC invoice. Five self-custodial ways to pay on Monad.**
+
+[Live application](https://blink-pay-web.vercel.app) ·
+[Hardened router](https://testnet.monadscan.com/address/0x6054f7E75E07f5d127DceEA3b2D683959a51c9AA) ·
+[Verified payment](https://testnet.monadscan.com/tx/0xb4a23e00583b366aee730f0a6cdbe11544efb1d9a129687979e9b0fa71328571) ·
+[Architecture](docs/ARCHITECTURE.md) ·
+[Security](docs/SECURITY.md)
+
+![BlinkPay desktop application](docs/assets/blinkpay-desktop.jpg)
+
 BlinkPay is an AI-assisted payment compiler on Monad. A merchant requests an
-exact USDC amount; BlinkPay finds a valid way to fund it from the payer's idle
+exact USDC amount; BlinkPay finds a valid way to fund it from the payer's wallet
 tokens or supported DeFi positions while enforcing the payer's constraints.
 
 The first release is a self-custodial, onchain checkout—not a Visa or
 Mastercard product. The payer always reviews and signs the transaction, and the
 AI never signs transactions or invents executable calldata.
+
+| Merchant mobile checkout | Payer mobile portal |
+| --- | --- |
+| ![BlinkPay merchant mobile checkout](docs/assets/blinkpay-merchant-mobile.jpg) | ![BlinkPay payer mobile portal](docs/assets/blinkpay-payer-mobile.jpg) |
 
 ## Target demo
 
@@ -20,10 +34,11 @@ AI never signs transactions or invents executable calldata.
 
 ## Initial payment routes
 
-- Direct USDC payment
-- Exact-output token-to-USDC swap
-- ERC-4626 vault withdrawal to USDC
-- Split payment using idle USDC plus one additional source
+1. Direct wallet USDC
+2. Exact-output WMON to USDC
+3. Exact ERC-4626 vault redemption
+4. Atomic wallet USDC + vault redemption
+5. Atomic wallet USDC + exact-output WMON
 
 Borrow-to-pay, delegated payments, cross-chain funding, and card rails are not
 part of the critical MVP.
@@ -58,6 +73,8 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 7A: contract, approval, pause, and planner security hardening
 - [x] Phase 7B: fuzz, invariant, pinned-fork, browser, dependency, and secret gates
 - [x] Phase 7C: exact source verification and hardened live-payment acceptance
+- [x] Phase 8A: product UI, mobile checkout, wallet header, and payer entry
+- [x] Phase 8B: production hosting, public release documentation, and link audit
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
@@ -100,6 +117,11 @@ match, and a live vault-funded payment passed exact-settlement, zero-custody,
 allowance, and replay checks. See [docs/PHASE_7_REPORT.md](docs/PHASE_7_REPORT.md)
 and [docs/SECURITY.md](docs/SECURITY.md).
 
+Phase 8 turns the tested system into the public Spark submission: a responsive
+landing page, merchant invoice creator, payer portal, live production hosting,
+architecture and security documentation, explorer fallbacks, and a timed demo
+script. See [docs/PHASE_8_REPORT.md](docs/PHASE_8_REPORT.md).
+
 ## Local development
 
 Prerequisites:
@@ -120,6 +142,36 @@ Open `http://localhost:3000`. The foundation screen reads the current Monad
 testnet block through the server, so an offline or incorrect RPC is visible
 instead of being presented as a successful connection.
 
+For AI-assisted preference parsing, configure one server-only provider key.
+Without one, BlinkPay safely falls back to its deterministic parser. Never use
+the `NEXT_PUBLIC_` prefix for AI or quote-provider keys.
+
+## Architecture
+
+The merchant signature travels with the invoice link. The payer app turns
+natural language into a strict preference schema, then deterministic code reads
+current Monad state, rejects unsafe plans, simulates the remaining routes, and
+ranks them. Only the payer wallet can authorize approvals and settlement.
+
+The deployed router verifies the invoice, immutable integrations, spend caps,
+exact merchant balance delta, zero-new-custody accounting, and replay state.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the diagram and execution
+boundary.
+
+## Test and verification
+
+```bash
+pnpm check
+pnpm test:e2e
+pnpm rpc:check
+```
+
+The release gate covers TypeScript packages, production build, desktop/mobile
+browser behavior, 60 Solidity tests, 512 fuzz cases, 24,576 stateful invariant
+calls, and a pinned Monad fork. Live wallet receipts independently verify direct,
+WMON, vault, and atomic-split settlement. Detailed evidence lives in the phase
+reports under `docs/`.
+
 ## Workspace
 
 ```text
@@ -134,8 +186,8 @@ docs/                      Architecture and phase evidence
 ```
 
 Phase 1 implementation evidence is recorded in
-[docs/PHASE_1_REPORT.md](docs/PHASE_1_REPORT.md). The remaining deployment gate
-is described in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+[docs/PHASE_1_REPORT.md](docs/PHASE_1_REPORT.md). Deployment procedures are in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 The current deployment, funding, and two-wallet acceptance gate is in
 [docs/TESTNET_LIVE_GATE.md](docs/TESTNET_LIVE_GATE.md). The 0x mainnet adapter
@@ -173,4 +225,4 @@ against their immutable onchain settings before the quote service uses them.
 
 ## License
 
-License selection will be completed before the public hackathon submission.
+[MIT](LICENSE) © 2026 Rudra Bhaskar.
