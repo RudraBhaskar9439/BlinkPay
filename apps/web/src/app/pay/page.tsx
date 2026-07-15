@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/app-header";
 import { PaymentLinkOpener } from "@/components/payment-link-opener";
 
 export const metadata = {
-  title: "Pay an invoice — BlinkPay",
+  title: "Pay an invoice",
 };
 
 export default async function PayPage({
