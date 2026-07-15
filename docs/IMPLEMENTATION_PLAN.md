@@ -357,6 +357,14 @@ wallets and small live amounts. Repeat it to prove it is not a one-off.
 CI is green, the hosted app works, contracts are verified, README setup is
 reproducible, and the demo can be completed twice without intervention.
 
+Status: passed on July 15, 2026 for the release-candidate scope. The hardened
+router has an exact Sourcify runtime match; the full automated, invariant,
+pinned-fork, browser, dependency, and secret gates pass; pause/unpause was
+exercised live; and a fresh merchant-to-payer flow settled exactly 0.1 USDC
+with zero router residuals and replay rejection. Public hosting and the final
+incognito submission rehearsal remain Phase 8 deliverables. See
+`PHASE_7_REPORT.md`.
+
 ## Phase 8 — Hackathon submission
 
 ### Goal

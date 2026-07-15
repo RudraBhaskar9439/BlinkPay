@@ -55,6 +55,9 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 - [x] Phase 6A: atomic direct-plus-vault and direct-plus-WMON contracts
 - [x] Phase 6B: reserve-aware split planner and five-route checkout
 - [x] Phase 6C: live direct-plus-vault payment with verified two-source deltas
+- [x] Phase 7A: contract, approval, pause, and planner security hardening
+- [x] Phase 7B: fuzz, invariant, pinned-fork, browser, dependency, and secret gates
+- [x] Phase 7C: exact source verification and hardened live-payment acceptance
 
 The foundation gate passed on July 14, 2026. See
 [docs/PHASE_0_REPORT.md](docs/PHASE_0_REPORT.md) for its evidence and known
@@ -88,6 +91,14 @@ leg, and either an exact ERC-4626 withdrawal or exact-output WMON swap funds
 only the remaining shortfall. The live gate settled a 1 USDC invoice from 0.8
 wallet USDC plus 0.2 vault USDC in one router call with zero retained balances
 and replay protection. See [docs/PHASE_6_REPORT.md](docs/PHASE_6_REPORT.md).
+
+Phase 7 is the hardened release candidate. It adds an owner-controlled payment
+pause, exact sell-token funding checks, pause-aware planning and execution,
+stateful invariants, a pinned Monad fork regression, browser release tests, and
+a documented threat model. The deployed source has an exact Sourcify runtime
+match, and a live vault-funded payment passed exact-settlement, zero-custody,
+allowance, and replay checks. See [docs/PHASE_7_REPORT.md](docs/PHASE_7_REPORT.md)
+and [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Local development
 
@@ -144,7 +155,7 @@ remains documented in [docs/PHASE_2_REPORT.md](docs/PHASE_2_REPORT.md).
 The verified testnet deployment is:
 
 - BlinkPay pool: `0x88a2208424bFB2D3fc4F299e92993FFe5fAFedb3`
-- BlinkPay five-route router: `0x7d6cECbDfD0359887e34ce89c15a313f37c1Fa1B`
+- BlinkPay hardened five-route router: `0x6054f7E75E07f5d127DceEA3b2D683959a51c9AA`
 - BlinkPay testnet ERC-4626 vault: `0xbb171586DE327A2c9BB2ea3A7D200B9A92fbeb89`
 
 These addresses are kept in version-controlled chain configuration and checked
