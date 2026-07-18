@@ -41,6 +41,11 @@ type SceneProps = {
 const Scene = ({ duration, children, dark = false, chapter, number, subtitle }: SceneProps) => {
   const frame = useCurrentFrame();
   const opacity = interpolate(frame, [0, 16, duration - 18, duration], [0, 1, 1, 0], clamp);
+  const cameraScale = interpolate(frame, [0, duration], [1.005, 1.025], clamp);
+  const cameraX = interpolate(frame, [0, duration], [6, -12], clamp);
+  const cameraY = Math.sin(frame / 68) * 5;
+  const sweepIn = interpolate(frame, [0, 24], [-260, 2180], { ...clamp, easing: Easing.inOut(Easing.cubic) });
+  const sweepOut = interpolate(frame, [duration - 24, duration], [-260, 2180], { ...clamp, easing: Easing.inOut(Easing.cubic) });
   return (
     <AbsoluteFill
       style={{
@@ -53,6 +58,42 @@ const Scene = ({ duration, children, dark = false, chapter, number, subtitle }: 
         overflow: "hidden",
       }}
     >
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: dark ? 0.11 : 0.07,
+          backgroundImage: dark
+            ? "linear-gradient(rgba(255,255,255,.16) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.16) 1px, transparent 1px)"
+            : "linear-gradient(rgba(17,17,15,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(17,17,15,.18) 1px, transparent 1px)",
+          backgroundSize: "64px 64px",
+          transform: `translate(${(frame * 0.16) % 64}px, ${(frame * 0.1) % 64}px)`,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          width: 620,
+          height: 620,
+          borderRadius: 999,
+          left: -180 + Math.sin(frame / 54) * 42,
+          top: 170 + Math.cos(frame / 61) * 32,
+          background: dark ? "rgba(111,92,255,.16)" : "rgba(111,92,255,.09)",
+          filter: "blur(90px)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          width: 520,
+          height: 520,
+          borderRadius: 999,
+          right: -150 + Math.cos(frame / 48) * 34,
+          top: -160 + Math.sin(frame / 57) * 30,
+          background: dark ? "rgba(223,255,156,.10)" : "rgba(255,122,77,.08)",
+          filter: "blur(100px)",
+        }}
+      />
       <div
         style={{
           position: "absolute",
@@ -86,7 +127,16 @@ const Scene = ({ duration, children, dark = false, chapter, number, subtitle }: 
           <span style={{ fontSize: 16, fontWeight: 750, letterSpacing: 1.5 }}>{chapter}</span>
         </div>
       </div>
-      {children(frame)}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          transform: `translate3d(${cameraX}px, ${cameraY}px, 0) scale(${cameraScale})`,
+          transformOrigin: "center center",
+        }}
+      >
+        {children(frame)}
+      </div>
       <div
         style={{
           position: "absolute",
@@ -125,6 +175,26 @@ const Scene = ({ duration, children, dark = false, chapter, number, subtitle }: 
           background: `linear-gradient(90deg, ${colors.purple}, ${colors.orange})`,
         }}
       />
+      {[sweepIn, sweepOut].map((left, index) => (
+        <div
+          key={index}
+          style={{
+            position: "absolute",
+            zIndex: 80,
+            top: -160,
+            bottom: -160,
+            left,
+            width: 92,
+            opacity: index === 0
+              ? interpolate(frame, [0, 6, 20, 24], [0, .7, .7, 0], clamp)
+              : interpolate(frame, [duration - 24, duration - 18, duration - 4, duration], [0, .65, .65, 0], clamp),
+            background: `linear-gradient(90deg, transparent, ${dark ? "rgba(169,156,255,.52)" : "rgba(111,92,255,.28)"}, transparent)`,
+            filter: "blur(16px)",
+            transform: "rotate(8deg)",
+            pointerEvents: "none",
+          }}
+        />
+      ))}
     </AbsoluteFill>
   );
 };
@@ -132,6 +202,8 @@ const Scene = ({ duration, children, dark = false, chapter, number, subtitle }: 
 const BrowserFrame = ({ src, frame }: { src: string; frame: number }) => {
   const lift = interpolate(frame, [0, 40], [55, 0], { ...clamp, easing: Easing.out(Easing.cubic) });
   const scale = interpolate(frame, [0, 360], [1.025, 1.07], clamp);
+  const float = Math.sin(frame / 31) * 7;
+  const yaw = Math.sin(frame / 70) * 0.45;
   return (
     <div
       style={{
@@ -141,7 +213,8 @@ const BrowserFrame = ({ src, frame }: { src: string; frame: number }) => {
         overflow: "hidden",
         border: "2px solid rgba(17,17,15,.75)",
         boxShadow: "18px 22px 0 rgba(111,92,255,.85), 0 40px 90px rgba(0,0,0,.22)",
-        transform: `translateY(${lift}px)`,
+        transform: `translate3d(${float * .35}px, ${lift + float}px, 0) rotate(${yaw}deg)`,
+        transformOrigin: "center center",
         background: colors.paper,
       }}
     >
@@ -186,6 +259,7 @@ const BrowserFrame = ({ src, frame }: { src: string; frame: number }) => {
 const PhoneFrame = ({ src, frame, side = "left" }: { src: string; frame: number; side?: "left" | "right" }) => {
   const entrance = spring({ fps: 30, frame, config: { damping: 16, stiffness: 100 } });
   const rotation = side === "left" ? -2.5 : 2.5;
+  const float = Math.sin((frame + (side === "left" ? 0 : 22)) / 28) * 9;
   return (
     <div
       style={{
@@ -196,7 +270,7 @@ const PhoneFrame = ({ src, frame, side = "left" }: { src: string; frame: number;
         background: "#121210",
         overflow: "hidden",
         boxShadow: `${side === "left" ? 22 : -22}px 28px 0 rgba(111,92,255,.72), 0 40px 80px rgba(0,0,0,.28)`,
-        transform: `translateY(${interpolate(entrance, [0, 1], [110, 0])}px) rotate(${rotation}deg)`,
+        transform: `translate3d(0, ${interpolate(entrance, [0, 1], [110, 0]) + float}px, 0) rotate(${rotation + Math.sin(frame / 76) * .5}deg)`,
       }}
     >
       <div style={{ position: "absolute", width: 116, height: 25, background: "#121210", borderRadius: 0, marginLeft: 134, zIndex: 2 }} />
@@ -392,7 +466,6 @@ const InvoiceScene = () => (
     subtitle="Step 1: Connect the merchant wallet, enter amount, description and expiry, sign the EIP-712 invoice, then share its link or QR."
   >
     {(frame) => {
-      const cardIn = spring({ frame: frame - 20, fps: 30, config: { damping: 18, stiffness: 100 } });
       return (
         <>
           <div style={{ position: "absolute", left: 130, top: 160 }}>
@@ -406,22 +479,26 @@ const InvoiceScene = () => (
                 ["Network", "Monad Testnet"],
                 ["Signature", "EIP-712 attached"],
                 ["Replay", "Invoice ID protected"],
-              ].map(([label, value], index) => (
-                <div
-                  key={label}
-                  style={{
-                    padding: "25px 28px",
-                    borderRadius: 22,
-                    background: index === 2 ? colors.lime : colors.white,
-                    border: "1px solid rgba(17,17,15,.18)",
-                    boxShadow: "0 16px 44px rgba(0,0,0,.07)",
-                    transform: `translateY(${interpolate(cardIn, [0, 1], [45, 0]) + index * 2}px)`,
-                  }}
-                >
-                  <div style={{ fontSize: 15, letterSpacing: 1.4, fontWeight: 800, color: colors.muted }}>{label.toUpperCase()}</div>
-                  <div style={{ marginTop: 10, fontSize: 28, fontWeight: 850 }}>{value}</div>
-                </div>
-              ))}
+              ].map(([label, value], index) => {
+                const itemIn = spring({ frame: frame - 18 - index * 8, fps: 30, config: { damping: 18, stiffness: 110 } });
+                return (
+                  <div
+                    key={label}
+                    style={{
+                      padding: "25px 28px",
+                      borderRadius: 22,
+                      background: index === 2 ? colors.lime : colors.white,
+                      border: "1px solid rgba(17,17,15,.18)",
+                      boxShadow: "0 16px 44px rgba(0,0,0,.07)",
+                      transform: `translateY(${interpolate(itemIn, [0, 1], [50, 0])}px) scale(${interpolate(itemIn, [0, 1], [.96, 1])})`,
+                      opacity: itemIn,
+                    }}
+                  >
+                    <div style={{ fontSize: 15, letterSpacing: 1.4, fontWeight: 800, color: colors.muted }}>{label.toUpperCase()}</div>
+                    <div style={{ marginTop: 10, fontSize: 28, fontWeight: 850 }}>{value}</div>
+                  </div>
+                );
+              })}
             </div>
             <div style={{ marginTop: 30, padding: "20px 24px", border: `2px solid ${colors.purple}`, borderRadius: 20, fontFamily: mono, fontSize: 17, color: colors.purple }}>
               amount · merchant · expiry · chain · router · invoiceId
@@ -495,8 +572,11 @@ const PolicyScene = () => (
 
 const RouteCard = ({ number, title, detail, color, active, frame, delay }: { number: string; title: string; detail: string; color: string; active?: boolean; frame: number; delay: number }) => {
   const enter = spring({ frame: frame - delay, fps: 30, config: { damping: 20, stiffness: 95 } });
+  const scan = interpolate(frame, [delay + 8, delay + 22, delay + 64, delay + 84], [0, 1, 1, 0], clamp);
+  const pulse = active ? .25 + (Math.sin(frame / 10) + 1) * .09 : scan * .16;
   return (
-    <div style={{ padding: "24px 26px", minHeight: 137, borderRadius: 24, background: active ? colors.white : "rgba(255,255,255,.55)", border: `2px solid ${active ? colors.purple : "rgba(17,17,15,.14)"}`, boxShadow: active ? "10px 12px 0 rgba(111,92,255,.28)" : "none", transform: `translateY(${interpolate(enter, [0, 1], [55, 0])}px)`, opacity: enter }}>
+    <div style={{ position: "relative", overflow: "hidden", padding: "24px 26px", minHeight: 137, borderRadius: 24, background: active ? colors.white : "rgba(255,255,255,.55)", border: `2px solid ${active || scan > .5 ? colors.purple : "rgba(17,17,15,.14)"}`, boxShadow: `10px 12px 0 rgba(111,92,255,${pulse})`, transform: `translateY(${interpolate(enter, [0, 1], [55, 0])}px) scale(${active ? 1 + Math.sin(frame / 18) * .004 : 1})`, opacity: enter }}>
+      <div style={{ position: "absolute", inset: 0, width: "38%", background: "linear-gradient(90deg, transparent, rgba(111,92,255,.14), transparent)", transform: `translateX(${interpolate(frame, [delay, delay + 90], [-160, 820], clamp)}px) skewX(-14deg)` }} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ fontSize: 15, fontWeight: 850, letterSpacing: 1.7, color: colors.muted }}>ROUTE {number}</div>
         <div style={{ width: 11, height: 11, borderRadius: 99, background: color }} />
@@ -559,12 +639,15 @@ const ProofScene = () => (
                 ["Router retained", "0 new tokens"],
                 ["Replay state", "PAID"],
                 ["Transaction", "SUCCESS"],
-              ].map(([label, value], index) => (
-                <div key={label} style={{ padding: "24px 25px", borderRadius: 22, background: index === 3 ? colors.lime : "rgba(255,255,255,.07)", color: index === 3 ? colors.ink : colors.white, border: "1px solid rgba(255,255,255,.15)" }}>
-                  <div style={{ fontSize: 14, letterSpacing: 1.5, fontWeight: 800, color: index === 3 ? colors.muted : "#aaa7a0" }}>{label.toUpperCase()}</div>
-                  <div style={{ marginTop: 10, fontFamily: mono, fontSize: 24, fontWeight: 850 }}>{value}</div>
-                </div>
-              ))}
+              ].map(([label, value], index) => {
+                const evidenceIn = spring({ frame: frame - 16 - index * 9, fps: 30, config: { damping: 17, stiffness: 110 } });
+                return (
+                  <div key={label} style={{ padding: "24px 25px", borderRadius: 22, background: index === 3 ? colors.lime : "rgba(255,255,255,.07)", color: index === 3 ? colors.ink : colors.white, border: "1px solid rgba(255,255,255,.15)", transform: `translateY(${interpolate(evidenceIn, [0, 1], [34, 0])}px) scale(${interpolate(evidenceIn, [0, 1], [.94, 1])})`, opacity: evidenceIn }}>
+                    <div style={{ fontSize: 14, letterSpacing: 1.5, fontWeight: 800, color: index === 3 ? colors.muted : "#aaa7a0" }}>{label.toUpperCase()}</div>
+                    <div style={{ marginTop: 10, fontFamily: mono, fontSize: 24, fontWeight: 850 }}>{value}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
           <div style={{ position: "absolute", right: 115, top: 165, width: 830, height: 700, borderRadius: 32, padding: "38px 42px", background: colors.white, color: colors.ink, boxShadow: "22px 25px 0 rgba(111,92,255,.78)" }}>
@@ -582,12 +665,15 @@ const ProofScene = () => (
                 ["ROUTER", "0x6054…c9AA"],
                 ["METHOD", "payFromVault"],
                 ["BLOCK", "44,982,723"],
-              ].map(([key, value]) => (
-                <div key={key} style={{ display: "flex", justifyContent: "space-between", padding: "20px 0", borderBottom: "1px solid #d8d3ca" }}>
-                  <span style={{ color: colors.muted, fontSize: 16, letterSpacing: 1.5, fontWeight: 800 }}>{key}</span>
-                  <span style={{ fontFamily: mono, fontSize: 20, fontWeight: 800 }}>{value}</span>
-                </div>
-              ))}
+              ].map(([key, value], index) => {
+                const rowIn = spring({ frame: frame - 24 - index * 9, fps: 30, config: { damping: 20, stiffness: 105 } });
+                return (
+                  <div key={key} style={{ display: "flex", justifyContent: "space-between", padding: "20px 0", borderBottom: "1px solid #d8d3ca", transform: `translateX(${interpolate(rowIn, [0, 1], [45, 0])}px)`, opacity: rowIn }}>
+                    <span style={{ color: colors.muted, fontSize: 16, letterSpacing: 1.5, fontWeight: 800 }}>{key}</span>
+                    <span style={{ fontFamily: mono, fontSize: 20, fontWeight: 800 }}>{value}</span>
+                  </div>
+                );
+              })}
             </div>
             <div style={{ marginTop: 28, fontFamily: mono, fontSize: 15, color: colors.purple, lineHeight: 1.45, wordBreak: "break-all" }}>
               0xb4a23e00583b366aee730f0a6cdbe11544efb1d9a129687979e9b0fa71328571
@@ -615,9 +701,12 @@ const OutroScene = () => (
               <div style={{ display: "inline-flex", padding: "10px 18px", borderRadius: 999, background: colors.lime, fontSize: 16, fontWeight: 850, letterSpacing: 1.8 }}>LIVE ON MONAD TESTNET</div>
               <div style={{ marginTop: 30, fontSize: 114, lineHeight: .92, letterSpacing: -7, fontWeight: 920 }}>Make every asset<br /><span style={{ color: colors.purple }}>feel spendable.</span></div>
               <div style={{ marginTop: 38, display: "flex", gap: 16, justifyContent: "center" }}>
-                {["60 Solidity tests", "24,576 invariant calls", "5 atomic routes", "0 custody"].map((metric) => (
-                  <div key={metric} style={{ padding: "17px 22px", borderRadius: 18, background: colors.white, border: "1px solid rgba(17,17,15,.16)", fontSize: 18, fontWeight: 800 }}>{metric}</div>
-                ))}
+                {["60 Solidity tests", "24,576 invariant calls", "5 atomic routes", "0 custody"].map((metric, index) => {
+                  const metricIn = spring({ frame: frame - 28 - index * 9, fps: 30, config: { damping: 17, stiffness: 120 } });
+                  return (
+                    <div key={metric} style={{ padding: "17px 22px", borderRadius: 18, background: colors.white, border: "1px solid rgba(17,17,15,.16)", boxShadow: `0 14px 36px rgba(111,92,255,${.08 + index * .025})`, fontSize: 18, fontWeight: 800, transform: `translateY(${interpolate(metricIn, [0, 1], [38, 0])}px) scale(${interpolate(metricIn, [0, 1], [.9, 1])})`, opacity: metricIn }}>{metric}</div>
+                  );
+                })}
               </div>
               <div style={{ marginTop: 44, display: "flex", gap: 16, justifyContent: "center", alignItems: "center" }}>
                 <div style={{ padding: "20px 30px", borderRadius: 17, background: colors.ink, color: colors.white, fontSize: 24, fontWeight: 850 }}>blink-pay-web.vercel.app</div>
@@ -625,8 +714,8 @@ const OutroScene = () => (
               </div>
             </div>
           </div>
-          <div style={{ position: "absolute", width: 480, height: 480, borderRadius: 999, border: `2px solid ${colors.purple}`, left: -140, top: 230, opacity: .22 }} />
-          <div style={{ position: "absolute", width: 620, height: 620, borderRadius: 999, border: `2px solid ${colors.orange}`, right: -240, top: 170, opacity: .2 }} />
+          <div style={{ position: "absolute", width: 480, height: 480, borderRadius: 999, border: `2px solid ${colors.purple}`, left: -140, top: 230, opacity: .22, transform: `rotate(${frame * .12}deg) scale(${1 + Math.sin(frame / 30) * .025})` }} />
+          <div style={{ position: "absolute", width: 620, height: 620, borderRadius: 999, border: `2px solid ${colors.orange}`, right: -240, top: 170, opacity: .2, transform: `rotate(${-frame * .08}deg) scale(${1 + Math.cos(frame / 34) * .025})` }} />
         </>
       );
     }}
@@ -637,6 +726,16 @@ export const BlinkPayDemo = ({ narrationFile }: { narrationFile?: string }) => (
   <AbsoluteFill style={{ background: colors.ink }}>
     <Audio src={staticFile("blinkpay-bed.mp3")} volume={0.16} />
     {narrationFile ? <Audio src={staticFile(narrationFile)} volume={1} /> : null}
+    {[180, 600, 1260, 2250, 3360, 4140].map((from) => (
+      <Sequence key={`whoosh-${from}`} from={from} durationInFrames={24}>
+        <Audio src={staticFile("blinkpay-whoosh.mp3")} volume={0.24} />
+      </Sequence>
+    ))}
+    {[2280, 2292, 2304, 2316, 2328].map((from) => (
+      <Sequence key={`tick-${from}`} from={from} durationInFrames={8}>
+        <Audio src={staticFile("blinkpay-tick.mp3")} volume={0.16} />
+      </Sequence>
+    ))}
     <Sequence from={0} durationInFrames={180}><ColdOpenScene /></Sequence>
     <Sequence from={180} durationInFrames={420}><IntroScene /></Sequence>
     <Sequence from={600} durationInFrames={660}><InvoiceScene /></Sequence>

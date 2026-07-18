@@ -12,8 +12,10 @@ pnpm --filter @blinkpay/video music
 ```
 
 Copy the final narration to `apps/video/public/narration.wav` after recording.
-The narration file, generated music, browser captures, and rendered MP4 are
-ignored by Git.
+The narration file, generated music and transition sound effects, browser
+captures, and rendered MP4 are ignored by Git. The motion system itself—camera
+pushes, parallax, staggered reveals, route scans and scene sweeps—remains fully
+reproducible in source control.
 
 ## Preview and render
 
