@@ -230,11 +230,117 @@ const Title = ({ eyebrow, children, dark = false }: { eyebrow: string; children:
   </div>
 );
 
+const ColdOpenScene = () => {
+  const frame = useCurrentFrame();
+  const beats = [
+    {
+      from: 0,
+      to: 66,
+      eyebrow: "THE PAYMENT PROBLEM",
+      lineOne: "The merchant wants",
+      lineTwo: "exactly 0.10 USDC.",
+      accent: colors.lime,
+    },
+    {
+      from: 58,
+      to: 126,
+      eyebrow: "THE WALLET REALITY",
+      lineOne: "Your value is",
+      lineTwo: "fragmented everywhere.",
+      accent: colors.orange,
+    },
+    {
+      from: 118,
+      to: 180,
+      eyebrow: "BLINKPAY ON MONAD",
+      lineOne: "One signed invoice.",
+      lineTwo: "The safest exact route.",
+      accent: colors.purpleSoft,
+    },
+  ];
+
+  return (
+    <AbsoluteFill
+      style={{
+        background: `radial-gradient(circle at 50% 46%, #302768 0%, ${colors.ink} 39%, #070706 100%)`,
+        color: colors.white,
+        fontFamily: font,
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: 0.14,
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
+          transform: `translateY(${(frame * 0.35) % 56}px)`,
+        }}
+      />
+      {[380, 650, 940].map((size, index) => (
+        <div
+          key={size}
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            width: size,
+            height: size,
+            borderRadius: 999,
+            border: `1px solid rgba(169,156,255,${0.28 - index * 0.06})`,
+            transform: `translate(-50%, -50%) scale(${1 + Math.sin((frame + index * 14) / 24) * 0.025})`,
+          }}
+        />
+      ))}
+      {beats.map((beat) => {
+        const opacity = interpolate(frame, [beat.from, beat.from + 9, beat.to - 11, beat.to], [0, 1, 1, 0], clamp);
+        const rise = interpolate(frame, [beat.from, beat.from + 18], [36, 0], { ...clamp, easing: Easing.out(Easing.cubic) });
+        return (
+          <div
+            key={beat.eyebrow}
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+              textAlign: "center",
+              opacity,
+              transform: `translateY(${rise}px)`,
+            }}
+          >
+            <div>
+              <div style={{ color: beat.accent, fontSize: 18, fontWeight: 900, letterSpacing: 3.4, marginBottom: 24 }}>
+                {beat.eyebrow}
+              </div>
+              <div style={{ fontSize: 82, lineHeight: 0.98, letterSpacing: -4.5, fontWeight: 920 }}>
+                {beat.lineOne}<br />
+                <span style={{ color: beat.accent }}>{beat.lineTwo}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          bottom: 0,
+          height: 7,
+          width: `${interpolate(frame, [0, 180], [0, 100], clamp)}%`,
+          background: `linear-gradient(90deg, ${colors.purple}, ${colors.orange}, ${colors.lime})`,
+        }}
+      />
+    </AbsoluteFill>
+  );
+};
+
 const IntroScene = () => (
   <Scene
-    duration={600}
+    duration={420}
     chapter="THE PROBLEM"
-    number="00:00"
+    number="00:06"
     subtitle="One exact invoice. Value fragmented across wallet tokens and DeFi positions."
   >
     {(frame) => {
@@ -531,7 +637,8 @@ export const BlinkPayDemo = ({ narrationFile }: { narrationFile?: string }) => (
   <AbsoluteFill style={{ background: colors.ink }}>
     <Audio src={staticFile("blinkpay-bed.mp3")} volume={0.16} />
     {narrationFile ? <Audio src={staticFile(narrationFile)} volume={1} /> : null}
-    <Sequence from={0} durationInFrames={600}><IntroScene /></Sequence>
+    <Sequence from={0} durationInFrames={180}><ColdOpenScene /></Sequence>
+    <Sequence from={180} durationInFrames={420}><IntroScene /></Sequence>
     <Sequence from={600} durationInFrames={660}><InvoiceScene /></Sequence>
     <Sequence from={1260} durationInFrames={990}><PolicyScene /></Sequence>
     <Sequence from={2250} durationInFrames={1110}><RoutesScene /></Sequence>
