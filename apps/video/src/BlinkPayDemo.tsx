@@ -341,7 +341,7 @@ const IntroScene = () => (
     duration={420}
     chapter="THE PROBLEM"
     number="00:06"
-    subtitle="One exact invoice. Value fragmented across wallet tokens and DeFi positions."
+    subtitle="BlinkPay routes one signed USDC invoice across wallet tokens and DeFi positions—without taking custody."
   >
     {(frame) => {
       const titleIn = spring({ frame, fps: 30, config: { damping: 18, stiffness: 90 } });
@@ -389,7 +389,7 @@ const InvoiceScene = () => (
     duration={660}
     chapter="SIGNED REQUEST"
     number="00:20"
-    subtitle="The merchant signs a portable EIP-712 invoice—no custodial database required."
+    subtitle="Step 1: Connect the merchant wallet, enter amount, description and expiry, sign the EIP-712 invoice, then share its link or QR."
   >
     {(frame) => {
       const cardIn = spring({ frame: frame - 20, fps: 30, config: { damping: 18, stiffness: 100 } });
@@ -399,7 +399,7 @@ const InvoiceScene = () => (
             <PhoneFrame src="ui/blinkpay-merchant-mobile.jpg" frame={frame} />
           </div>
           <div style={{ position: "absolute", left: 720, top: 200, width: 990 }}>
-            <Title eyebrow="MERCHANT FLOW">A signed request,<br />portable by design.</Title>
+            <Title eyebrow="STEP 1 · MERCHANT CREATES THE REQUEST">A signed request,<br />portable by design.</Title>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginTop: 50 }}>
               {[
                 ["Exact amount", "0.10 USDC"],
@@ -439,7 +439,7 @@ const PolicyScene = () => (
     dark
     chapter="AI WITH BOUNDARIES"
     number="00:42"
-    subtitle="AI translates intent into strict policy. Deterministic code owns every financial decision."
+    subtitle="Step 2: The payer opens the link, connects a wallet, describes preferences, and asks BlinkPay to analyze live routes."
   >
     {(frame) => {
       const pulse = 0.76 + Math.sin(frame / 18) * 0.08;
@@ -447,7 +447,7 @@ const PolicyScene = () => (
       return (
         <>
           <div style={{ position: "absolute", left: 105, top: 165, width: 820 }}>
-            <Title eyebrow="NATURAL LANGUAGE → STRICT POLICY" dark>Helpful intelligence.<br /><span style={{ color: colors.lime }}>Zero signing authority.</span></Title>
+            <Title eyebrow="STEP 2 · PAYER SETS BOUNDARIES" dark>Helpful intelligence.<br /><span style={{ color: colors.lime }}>Zero signing authority.</span></Title>
             <div style={{ marginTop: 42, display: "flex", gap: 12, flexWrap: "wrap" }}>
               <Pill accent>Preserve MON</Pill>
               <Pill>Keep 0.05 USDC liquid</Pill>
@@ -512,12 +512,12 @@ const RoutesScene = () => (
     duration={1110}
     chapter="DETERMINISTIC ROUTING"
     number="01:15"
-    subtitle="Five real routes are simulated, constrained, and ranked before the wallet sees a transaction."
+    subtitle="Step 3: Compare eligible routes, inspect rejected constraints, choose the recommendation, then approve the capped wallet transaction."
   >
     {(frame) => (
       <>
         <div style={{ position: "absolute", left: 95, top: 150, width: 1160 }}>
-          <Title eyebrow="THE ROUTE ENGINE">One invoice.<br /><span style={{ color: colors.purple }}>Five ways to settle.</span></Title>
+          <Title eyebrow="STEP 3 · ANALYZE, REVIEW, PAY">One invoice.<br /><span style={{ color: colors.purple }}>Five ways to settle.</span></Title>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 40 }}>
             <RouteCard number="01" title="Wallet USDC" detail="Direct settlement" color={colors.lime} active frame={frame} delay={10} />
             <RouteCard number="02" title="WMON" detail="Exact-output swap" color={colors.purple} frame={frame} delay={22} />
@@ -545,14 +545,14 @@ const ProofScene = () => (
     dark
     chapter="ONCHAIN PROOF"
     number="01:52"
-    subtitle="A real Monad testnet receipt proves exact settlement, zero retained funds, and replay protection."
+    subtitle="Step 4: The router settles exact USDC atomically; the receipt, balance delta, paid state, and replay rejection verify the result."
   >
     {(frame) => {
       const check = spring({ frame: frame - 20, fps: 30, config: { damping: 12, stiffness: 120 } });
       return (
         <>
           <div style={{ position: "absolute", left: 110, top: 165, width: 760 }}>
-            <Title eyebrow="VERIFIED ON MONAD" dark>Proof, not<br /><span style={{ color: colors.lime }}>a success screen.</span></Title>
+            <Title eyebrow="STEP 4 · VERIFY THE RECEIPT" dark>Proof, not<br /><span style={{ color: colors.lime }}>a success screen.</span></Title>
             <div style={{ marginTop: 42, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {[
                 ["Merchant received", "+0.100000 USDC"],

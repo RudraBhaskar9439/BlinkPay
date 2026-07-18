@@ -6,39 +6,43 @@ the headings or timestamps aloud.
 
 ## 00:00–00:20 — The problem
 
-A merchant wants exactly USDC, but my value is often split across wallet
-tokens and yield positions. Today I have to inspect balances, swap or withdraw,
-and still make sure the merchant receives the exact amount. BlinkPay compiles
-that workflow into one self-custodial payment on Monad.
+BlinkPay is a self-custodial payment router on Monad. A merchant asks for an
+exact amount of USDC, while the payer may hold value as wallet USDC, WMON, vault
+shares, or a combination of them. BlinkPay turns those fragmented assets into
+one exact payment under rules the payer controls.
 
 ## 00:20–00:42 — The signed request
 
-The merchant signs a portable EIP-712 invoice. The amount, merchant, expiry,
-chain, router, and invoice ID are bound by the signature. The resulting link
-and QR contain the invoice—not a custodial database record.
+First, the merchant connects a wallet, enters the USDC amount, description and
+expiry, then selects Sign invoice and approves the EIP-712 message. The amount,
+merchant, chain, router and invoice ID are bound by that signature. BlinkPay
+creates a portable payment link and QR that the merchant shares with the payer.
 
 ## 00:42–01:15 — AI with boundaries
 
-The AI only converts natural language into a strict preference policy. It has
-no access to addresses, calldata, quotes, or signing. Deterministic code reads
-current balances, allowances, vault previews, quote deadlines, gas, router
-pause state, and replay state. Ineligible routes stay visible with the exact
-failed constraint.
+The payer opens the link and connects a wallet on Monad Testnet. They can type
+preferences such as preserve MON, keep some USDC liquid, and do not borrow.
+Selecting Apply preferences converts that language into strict policy. The AI
+never receives wallet addresses, calldata, quotes, or signing authority. Then
+Analyze wallet routes reads live balances, allowances, vault previews, gas,
+quote deadlines, router state and replay state.
 
 ## 01:15–01:52 — Five executable routes
 
-BlinkPay supports five real routes: direct USDC, exact-output WMON, exact
-ERC-4626 redemption, and two atomic split routes. Every candidate is simulated
-and constrained before ranking. The payer reviews a capped transaction in
-their wallet. The router either delivers the signed USDC amount exactly, or the
-whole transaction reverts.
+BlinkPay compares five executable routes: direct USDC, exact-output WMON,
+exact ERC-4626 redemption, and two atomic split routes. Unavailable routes stay
+visible and explain which constraint failed. The payer reviews the recommended
+route, selects Pay, approves only the required token allowance if prompted,
+and confirms the final transaction in the wallet. The router either delivers
+the signed amount exactly or the entire operation reverts.
 
 ## 01:52–02:18 — Onchain proof
 
-This is a real Monad testnet receipt. The merchant gained exactly zero point
-one USDC, the payer redeemed exactly zero point one vault shares, the router
-retained zero new tokens, and the invoice changed from unpaid to paid.
-Replaying the same calldata reverts as already paid.
+After confirmation, BlinkPay shows the onchain receipt. This real Monad
+Testnet transaction increased the merchant by exactly zero point one USDC,
+left no new tokens in the router, and changed the invoice from unpaid to paid.
+The same signed invoice cannot be used twice: replaying it reverts as already
+paid.
 
 ## 02:18–02:45 — Why it matters
 
