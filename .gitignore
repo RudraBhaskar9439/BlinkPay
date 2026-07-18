@@ -35,3 +35,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .vercel
+
+# Demo video working files
+video-output/
+apps/video/public/blinkpay-bed.mp3
+apps/video/public/narration.*
+apps/video/public/captures/

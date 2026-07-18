@@ -1,0 +1,25 @@
+{
+  "name": "@blinkpay/video",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts BlinkPayDemo ../../video-output/blinkpay-demo-draft.mp4 --codec=h264 --crf=16",
+    "render:final": "remotion render src/index.ts BlinkPayDemo ../../video-output/blinkpay-demo-final.mp4 --codec=h264 --crf=16 --props='{\"narrationFile\":\"narration.wav\"}'",
+    "render:frame": "remotion still src/index.ts BlinkPayDemo ../../video-output/blinkpay-preview.png --frame=180",
+    "music": "bash scripts/generate-music.sh",
+    "typecheck": "tsc --noEmit --incremental false"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.490",
+    "remotion": "4.0.490",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.3"
+  }
+}
