@@ -33,7 +33,8 @@ to read in the final video.
    readable.
 6. Select the recommended route.
 7. If MetaMask requests a token approval, confirm only the displayed exact
-   amount for the BlinkPay router.
+   amount and verify the spender is the deployed BlinkPay router:
+   `0x6054f7E75E07f5d127DceEA3b2D683959a51c9AA`.
 8. Approve the final payment transaction.
 9. Hold on the successful receipt, then open its Monadscan link.
 
