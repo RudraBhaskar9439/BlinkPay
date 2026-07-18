@@ -42,4 +42,5 @@ apps/video/public/blinkpay-bed.mp3
 apps/video/public/blinkpay-whoosh.mp3
 apps/video/public/blinkpay-tick.mp3
 apps/video/public/narration.*
+apps/video/public/story-narration.*
 apps/video/public/captures/

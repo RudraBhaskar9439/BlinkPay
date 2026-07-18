@@ -1,8 +1,14 @@
 # BlinkPay Spark demo video
 
-This Remotion project renders the professional 2:45 BlinkPay submission video.
-The visuals are timed to `docs/VIDEO_NARRATION.md`; final narration is supplied
-by the project owner and intentionally kept out of Git.
+This Remotion project contains two reproducible BlinkPay submission cuts:
+
+- `BlinkPayStory` is the primary 2:55 merchant-to-payment story. It follows a
+  1 USDC request from signed QR through mobile checkout, constrained AI policy,
+  deterministic route selection, wallet confirmation, and real onchain proof.
+- `BlinkPayDemo` is the earlier 2:45 product overview.
+
+The primary visuals are timed to `docs/VIDEO_STORY_NARRATION.md`. Final
+narration is supplied by the project owner and intentionally kept out of Git.
 
 ## Prepare
 
@@ -11,7 +17,8 @@ pnpm install --frozen-lockfile
 pnpm --filter @blinkpay/video music
 ```
 
-Copy the final narration to `apps/video/public/narration.wav` after recording.
+Copy the final story narration to
+`apps/video/public/story-narration.wav` after recording.
 The narration file, generated music and transition sound effects, browser
 captures, and rendered MP4 are ignored by Git. The motion system itself—camera
 pushes, parallax, staggered reveals, route scans and scene sweeps—remains fully
@@ -24,8 +31,10 @@ pnpm --filter @blinkpay/video studio
 pnpm --filter @blinkpay/video render:frame
 pnpm --filter @blinkpay/video render
 pnpm --filter @blinkpay/video render:final
+pnpm --filter @blinkpay/video render:story
+pnpm --filter @blinkpay/video render:story:final
 ```
 
-The music-only draft is written to `video-output/blinkpay-demo-draft.mp4`.
-After `narration.wav` is present, the narrated export is written to
-`video-output/blinkpay-demo-final.mp4`.
+The music-only story cut is written to
+`video-output/blinkpay-story-cut.mp4`. After `story-narration.wav` is present,
+the narrated export is written to `video-output/blinkpay-story-final.mp4`.
