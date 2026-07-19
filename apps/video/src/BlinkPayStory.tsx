@@ -453,7 +453,10 @@ const OutroScene = () => (
 
 export const BlinkPayStory = ({ narrationFile }: { narrationFile?: string }) => (
   <AbsoluteFill style={{ background: c.ink }}>
-    <Audio src={staticFile("blinkpay-bed.mp3")} volume={0.15} />
+    <Audio
+      src={staticFile("blinkpay-bed.mp3")}
+      volume={(frame) => interpolate(frame, [0, 75, 5100, 5249], [0, 0.48, 0.48, 0], clamp)}
+    />
     {narrationFile ? <Audio src={staticFile(narrationFile)} volume={1} /> : null}
     {[270, 1050, 1500, 2400, 3450, 4200, 4830].map((from) => <Sequence key={from} from={from} durationInFrames={24}><Audio src={staticFile("blinkpay-whoosh.mp3")} volume={0.24} /></Sequence>)}
     {[2490, 2508, 2526, 2544, 2562, 3590, 3690].map((from) => <Sequence key={from} from={from} durationInFrames={8}><Audio src={staticFile("blinkpay-tick.mp3")} volume={0.15} /></Sequence>)}

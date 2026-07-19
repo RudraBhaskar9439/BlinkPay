@@ -15,10 +15,12 @@ narration is supplied by the project owner and intentionally kept out of Git.
 ```bash
 pnpm install --frozen-lockfile
 pnpm --filter @blinkpay/video music
+pnpm --filter @blinkpay/video narration
 ```
 
-Copy the final story narration to
-`apps/video/public/story-narration.wav` after recording.
+Place the eight owner recordings in `video-output/audio`, then run the
+`narration` command. It performs restrained cleanup, scene alignment and
+mastering, and writes `apps/video/public/story-narration.wav`.
 The narration file, generated music and transition sound effects, browser
 captures, and rendered MP4 are ignored by Git. The motion system itself—camera
 pushes, parallax, staggered reveals, route scans and scene sweeps—remains fully

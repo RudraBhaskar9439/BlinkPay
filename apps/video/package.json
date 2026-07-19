@@ -10,6 +10,7 @@
     "render:story:final": "remotion render src/index.ts BlinkPayStory ../../video-output/blinkpay-story-final.mp4 --codec=h264 --crf=16 --props='{\"narrationFile\":\"story-narration.wav\"}'",
     "render:frame": "remotion still src/index.ts BlinkPayDemo ../../video-output/blinkpay-preview.png --frame=180",
     "music": "bash scripts/generate-music.sh",
+    "narration": "bash scripts/master-story-narration.sh",
     "qr": "node scripts/generate-qr.mjs",
     "typecheck": "tsc --noEmit --incremental false"
   },
